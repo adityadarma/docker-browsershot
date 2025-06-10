@@ -47,15 +47,21 @@ if ($method === 'POST' && $uri === '/') {
         $browsershot->setOption('executablePath', '/usr/bin/chromium-browser');
         $browsershot->noSandbox();
         $browsershot->fullPage();
+        $browsershot->hideBrowserHeaderAndFooter();
 
         if (! empty($input['width']) && ! empty($input['height'])) {
-            $browsershot->paperSize($input['width'], $input['height']);
+            if ($input['type'] === 'pdf') {
+                $browsershot->paperSize($input['width'], $input['height']);
+            } else {
+                $browsershot->windowSize($input['width'], $input['height']);
+            }
         }
 
         if (! empty($input['format'])) {
             $browsershot->format($input['format']);
         }
-        $filename = "{$randomString}.{$filetype}";
+        
+        $filename = "tmp/{$randomString}.{$filetype}";
         $browsershot->save($filename);
 
         $image_data = file_get_contents($filename);

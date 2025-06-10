@@ -11,7 +11,7 @@ ENV TZ="Asia/Makassar"
 
 # Set label information
 LABEL org.opencontainers.image.maintainer="Aditya Darma <me@adityadarma.dev>"
-LABEL org.opencontainers.image.description="Browsershor base on PHP."
+LABEL org.opencontainers.image.description="Browsershot base on PHP."
 LABEL org.opencontainers.image.os="Alpine Linux ${ALPINE_VERSION}"
 LABEL org.opencontainers.image.php="${PHP_VERSION}"
 LABEL org.opencontainers.image.node="${NODE_VERSION}"
@@ -25,35 +25,19 @@ RUN apk add --update --no-cache \
     ttf-freefont \
     fontconfig \
     tzdata \
-    curl \
-    git \
     nano \
     nginx \
     supervisor \
     gettext \
     php${PHP_NUMBER} \
-    php${PHP_NUMBER}-bcmath \
-    php${PHP_NUMBER}-curl \
-    php${PHP_NUMBER}-ctype \
-    php${PHP_NUMBER}-dom \
     php${PHP_NUMBER}-exif \
-    php${PHP_NUMBER}-fileinfo \
-    php${PHP_NUMBER}-iconv \
     php${PHP_NUMBER}-fpm \
     php${PHP_NUMBER}-gd \
     php${PHP_NUMBER}-json \
     php${PHP_NUMBER}-mbstring \
     php${PHP_NUMBER}-opcache \
-    php${PHP_NUMBER}-openssl \
     php${PHP_NUMBER}-phar \
-    php${PHP_NUMBER}-pdo_mysql \
     php${PHP_NUMBER}-session \
-    php${PHP_NUMBER}-simplexml \
-    php${PHP_NUMBER}-tokenizer \
-    php${PHP_NUMBER}-xml \
-    php${PHP_NUMBER}-xmlreader \
-    php${PHP_NUMBER}-xmlwriter \
-    php${PHP_NUMBER}-zip \
     && rm -rf /var/cache/apk/*
 
 # Symlink if not found
@@ -73,6 +57,7 @@ COPY .docker/www.conf /etc/php${PHP_NUMBER}/php-fpm.d/www.conf
 COPY .docker/php.ini /etc/php${PHP_NUMBER}/conf.d/custom.ini
 COPY .docker/nginx.conf /etc/nginx/nginx.conf
 COPY .docker/supervisord.conf.template /etc/supervisord.conf.template
+COPY .docker/entrypoint.sh /entrypoint.sh
 
 # Setup document root for application
 WORKDIR /app
@@ -80,12 +65,10 @@ WORKDIR /app
 # Replace string and make sure files/folders needed by the processes are accessable when they run under the nobody user
 RUN sed -i "s|command=php-fpm -F|command=php-fpm${PHP_NUMBER} -F|g" /etc/supervisord.conf.template && \
     chown -R nobody:nogroup /app /run /var/lib/nginx /var/log/nginx /etc/supervisord.conf && \
-    git config --system --add safe.directory /app
+    chmod +x /entrypoint.sh
 
-# Copy file entrypoint to container
-COPY .docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 RUN npm install -g puppeteer
+RUN rm -rf /root/.cache /root/.npm
 
 # Switch to use a non-root user from here on
 USER nobody
