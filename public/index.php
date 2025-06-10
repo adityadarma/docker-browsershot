@@ -30,32 +30,48 @@ checkAppKeyMiddleware();
 // Check route and method
 if ($method === 'POST' && $uri === '/') {
     try {
+        $randomString = bin2hex(random_bytes(16));
         $input = json_decode(file_get_contents('php://input'), true);
-        
+        $filetype = $input['type'] ?? 'png';
         if (empty($input['url']) && empty($input['html'])) {
             http_response_code(400);
             echo json_encode(['error' => 'Param url or html must be insert']);
             exit;
         }
 
-        if ($input['url']) {
+        if (! empty($input['url'])) {
             $browsershot = \Spatie\Browsershot\Browsershot::url($input['url']);
-        } elseif($input['html']) {
+        } elseif(! empty($input['html'])) {
             $browsershot = \Spatie\Browsershot\Browsershot::html($input['html']);
         }
-        $data = $browsershot->setOption('executablePath', '/usr/bin/chromium-browser')
-            ->noSandbox()
-            ->fullPage()
-            ->base64Screenshot();
+        $browsershot->setOption('executablePath', '/usr/bin/chromium-browser');
+        $browsershot->noSandbox();
+        $browsershot->fullPage();
+
+        if (! empty($input['width']) && ! empty($input['height'])) {
+            $browsershot->paperSize($input['width'], $input['height']);
+        }
+
+        if (! empty($input['format'])) {
+            $browsershot->format($input['format']);
+        }
+        $filename = "{$randomString}.{$filetype}";
+        $browsershot->save($filename);
+
+        $image_data = file_get_contents($filename);
+        $base64string = base64_encode($image_data);
+        unlink($filename);
+
+        http_response_code(200);
         echo json_encode([
             'status' => 'success',
-            'data' => $data,
+            'data' => $base64string,
         ]);
     } catch (\Throwable $th) {
         http_response_code(500);
-        echo json_encode(['error' => $th->getMessage()]);
+        echo json_encode(['status' => 'failed', 'message' => $th->getMessage()]);
     }
 } else {
     http_response_code(404);
-    echo json_encode(['error' => 'Not Found']);
+    echo json_encode(['status' => 'failed', 'message' => 'Not Found']);
 }
