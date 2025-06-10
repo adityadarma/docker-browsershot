@@ -1,0 +1,16 @@
+services:
+  app:
+    container_name: browsershot
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ALPINE_VERSION: 3.21
+        PHP_VERSION: 8.3
+        PHP_NUMBER: 83
+    hostname: browsershot
+    volumes:
+      - ./:/app
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
