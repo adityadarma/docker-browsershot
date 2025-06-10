@@ -30,22 +30,29 @@ checkAppKeyMiddleware();
 // Check route and method
 if ($method === 'POST' && $uri === '/') {
     try {
-        // Ambil input JSON
         $input = json_decode(file_get_contents('php://input'), true);
         
-        // Simulasikan response
-        // echo json_encode([
-        //     'message' => 'Data diterima',
-        //     'data' => $input['url'],
-        // ]);
-        return \Spatie\Browsershot\Browsershot::url('https://www.google.com')
-            ->setOption('executablePath', '/usr/bin/chromium-browser')
-            ->setIncludePath('$PATH:/usr/local/bin')
+        if (empty($input['url']) && empty($input['html'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Param url or html must be insert']);
+            exit;
+        }
+
+        if ($input['url']) {
+            $browsershot = \Spatie\Browsershot\Browsershot::url($input['url']);
+        } elseif($input['html']) {
+            $browsershot = \Spatie\Browsershot\Browsershot::html($input['html']);
+        }
+        $data = $browsershot->setOption('executablePath', '/usr/bin/chromium-browser')
             ->noSandbox()
-            // ->fullPage()
-            ->savePdf('test.pdf');
+            ->fullPage()
+            ->base64Screenshot();
+        echo json_encode([
+            'status' => 'success',
+            'data' => $data,
+        ]);
     } catch (\Throwable $th) {
-        http_response_code(404);
+        http_response_code(500);
         echo json_encode(['error' => $th->getMessage()]);
     }
 } else {
