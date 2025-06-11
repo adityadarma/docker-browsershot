@@ -37,6 +37,7 @@ RUN apk add --update --no-cache \
     php${PHP_NUMBER}-json \
     php${PHP_NUMBER}-mbstring \
     php${PHP_NUMBER}-opcache \
+    php${PHP_NUMBER}-openssl \
     php${PHP_NUMBER}-phar \
     php${PHP_NUMBER}-session \
     && rm -rf /var/cache/apk/*
