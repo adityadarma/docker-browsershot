@@ -33,55 +33,54 @@ if ($method === 'POST' && $uri === '/') {
         $randomString = bin2hex(random_bytes(16));
         $input = json_decode(file_get_contents('php://input'), true);
 
-    
-        // $service = new App\Services\BrowsershotService();
-        // $result = $service->handleRequest($input);
+        $service = new App\Services\BrowsershotService();
+        $result = $service->handleRequest($input);
         
-        $filetype = $input['type'] ?? 'png';
-        if (empty($input['url']) && empty($input['html'])) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Param url or html must be insert']);
-            exit;
-        }
+        // $filetype = $input['type'] ?? 'png';
+        // if (empty($input['url']) && empty($input['html'])) {
+        //     http_response_code(400);
+        //     echo json_encode(['error' => 'Param url or html must be insert']);
+        //     exit;
+        // }
 
-        if (! empty($input['url'])) {
-            $browsershot = \Spatie\Browsershot\Browsershot::url($input['url']);
-        } elseif(! empty($input['html'])) {
-            $browsershot = \Spatie\Browsershot\Browsershot::html($input['html']);
-        }
+        // if (! empty($input['url'])) {
+        //     $browsershot = \Spatie\Browsershot\Browsershot::url($input['url']);
+        // } elseif(! empty($input['html'])) {
+        //     $browsershot = \Spatie\Browsershot\Browsershot::html($input['html']);
+        // }
 
-        $browsershot->setOption('executablePath', '/usr/bin/chromium-browser');
-        $browsershot->noSandbox();
-        $browsershot->fullPage();
-        $browsershot->hideBrowserHeaderAndFooter();
+        // $browsershot->setOption('executablePath', '/usr/bin/chromium-browser');
+        // $browsershot->noSandbox();
+        // $browsershot->fullPage();
+        // $browsershot->hideBrowserHeaderAndFooter();
 
-        if (! empty($input['width']) && ! empty($input['height'])) {
-            if ($input['type'] === 'pdf') {
-                $browsershot->paperSize($input['width'], $input['height'])->base64pdf();
-            } else {
-                $browsershot->windowSize($input['width'], $input['height'])->base64Screenshot();
-            }
-        }
+        // if (! empty($input['width']) && ! empty($input['height'])) {
+        //     if ($input['type'] === 'pdf') {
+        //         $browsershot->paperSize($input['width'], $input['height']);
+        //     } else {
+        //         $browsershot->windowSize($input['width'], $input['height']);
+        //     }
+        // }
 
-        if (! empty($input['format'])) {
-            $browsershot->format($input['format']);
-        }
+        // if (! empty($input['format'])) {
+        //     $browsershot->format($input['format']);
+        // }
         
-        $filename = "tmp/{$randomString}.{$filetype}";
-        $browsershot->save($filename);
+        // $filename = "tmp/{$randomString}.{$filetype}";
+        // $browsershot->save($filename);
 
-        $image_data = file_get_contents($filename);
+        // $image_data = file_get_contents($filename);
         // $base64string = base64_encode($image_data);
-        unlink($filename);
+        // unlink($filename);
 
-        http_response_code(200);
-        echo json_encode([
-            'status' => 'success',
-            'data' => $image_data,
-        ]);
+        // http_response_code(200);
+        // echo json_encode([
+        //     'status' => 'success',
+        //     'data' => $base64string,
+        // ]);
 
-        // http_response_code($result['status'] === 'success' ? 200 : 500);
-        // echo json_encode($result);
+        http_response_code($result['status'] === 'success' ? 200 : 500);
+        echo json_encode($result);
     } catch (\Throwable $th) {
         http_response_code(500);
         echo json_encode(['status' => 'failed', 'message' => $th->getMessage()]);

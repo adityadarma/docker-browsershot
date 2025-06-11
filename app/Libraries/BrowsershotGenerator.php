@@ -184,7 +184,8 @@ class BrowsershotGenerator
             ->timeout($this->options['timeout']);
 
         if ($this->options['noSandbox']) {
-            $browsershot->setOption('args', ['--no-sandbox']);
+            $browsershot->setOption('args', ['--no-sandbox'])
+                ->setOption('executablePath', '/usr/bin/chromium-browser');
         }
 
         return $browsershot;
