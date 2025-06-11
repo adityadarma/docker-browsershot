@@ -34,7 +34,7 @@ if ($method === 'POST' && $uri === '/') {
         $input = json_decode(file_get_contents('php://input'), true);
 
     
-        $service = new \App\Services\BrowsershotService();
+        $service = new App\Services\BrowsershotService();
         $result = $service->handleRequest($input);
         
         // $filetype = $input['type'] ?? 'png';
