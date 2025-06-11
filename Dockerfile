@@ -18,6 +18,7 @@ LABEL org.opencontainers.image.node="${NODE_VERSION}"
 
 # Install package
 RUN apk add --update --no-cache \
+    git \
     chromium \
     nss \
     freetype \
@@ -65,7 +66,8 @@ WORKDIR /app
 # Replace string and make sure files/folders needed by the processes are accessable when they run under the nobody user
 RUN sed -i "s|command=php-fpm -F|command=php-fpm${PHP_NUMBER} -F|g" /etc/supervisord.conf.template && \
     chown -R nobody:nogroup /app /run /var/lib/nginx /var/log/nginx /etc/supervisord.conf && \
-    chmod +x /entrypoint.sh
+    chmod +x /entrypoint.sh && \
+    git config --system --add safe.directory /app
 
 RUN npm install -g puppeteer
 RUN rm -rf /root/.cache /root/.npm
