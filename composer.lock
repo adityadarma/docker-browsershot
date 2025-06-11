@@ -30,6 +30,7 @@
             "type": "library",
             "autoload": {
                 "psr-4": {
+                    "App\\": "app/",
                     "GrahamCampbell\\ResultType\\": "src/"
                 }
             },
