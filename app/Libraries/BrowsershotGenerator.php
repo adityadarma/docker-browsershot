@@ -2,13 +2,13 @@
 
 namespace App\Libraries;
 
-use App\Utilities\StorageFile;
 use Spatie\Browsershot\Browsershot;
-use Illuminate\Support\Facades\Storage;
 
 class BrowsershotGenerator
 {
-    protected $html;
+    protected $content;
+    protected $contentType; // 'html' or 'url'
+    protected $outputType = 'pdf';
     protected $options = [
         'format' => 'A4',
         'landscape' => false,
@@ -18,29 +18,63 @@ class BrowsershotGenerator
         'noSandbox' => true,
         'deviceScaleFactor' => 1,
         'quality' => 90,
+        'nodeBinary' => '',
+        'npmBinary' => ''
     ];
 
     /**
      * Constructor
      *
-     * @param string $html
+     * @param string $content HTML content or URL
+     * @param string $type 'html' or 'url'
      */
-    public function __construct(
-        string $html = ''
-    )
+    public function __construct(string $content = '', string $type = 'html')
     {
-        $this->html = $html;
+        $this->setContent($content, $type);
+
+        // Ambil path binary dari environment jika ada
+        $this->options['nodeBinary'] = getenv('NODE_BINARY_PATH') ?: $this->options['nodeBinary'];
+        $this->options['npmBinary'] = getenv('NPM_BINARY_PATH') ?: $this->options['npmBinary'];
+        
+        // Optional: Ambil chromium path jika ada
+        if (getenv('CHROMIUM_BINARY_PATH')) {
+            $this->options['executablePath'] = getenv('CHROMIUM_BINARY_PATH');
+        }
     }
 
     /**
-     * Set HTML content
+     * Set content (HTML or URL)
      *
-     * @param string $html
+     * @param string $content
+     * @param string $type 'html' or 'url'
      * @return $this
+     * @throws \InvalidArgumentException
      */
-    public function setHtml(string $html): self
+    public function setContent(string $content, string $type = 'html'): self
     {
-        $this->html = $html;
+        if (!in_array($type, ['html', 'url'])) {
+            throw new \InvalidArgumentException("Content type must be either 'html' or 'url'");
+        }
+
+        $this->content = $content;
+        $this->contentType = $type;
+        return $this;
+    }
+
+    /**
+     * Set output type (pdf or image)
+     *
+     * @param string $type
+     * @return $this
+     * @throws \InvalidArgumentException
+     */
+    public function setOutputType(string $type): self
+    {
+        if (!in_array($type, ['pdf', 'image'])) {
+            throw new \InvalidArgumentException("Output type must be either 'pdf' or 'image'");
+        }
+
+        $this->outputType = $type;
         return $this;
     }
 
@@ -141,51 +175,209 @@ class BrowsershotGenerator
     }
 
     /**
-     * Get PDF content as base64
+     * Set Node.js binary path
      *
-     * @return string
+     * @param string $path
+     * @return $this
      */
-    public function getPdfBase64(): string
+    public function setNodeBinary(string $path): self
     {
-        return $this->prepareBrowsershot()
-            ->format($this->options['format'])
-            ->landscape($this->options['landscape'])
-            ->margins(
-                $this->options['margin']['top'] ?? 0,
-                $this->options['margin']['right'] ?? 0,
-                $this->options['margin']['bottom'] ?? 0,
-                $this->options['margin']['left'] ?? 0
-            )
-            ->base64pdf();
+        $this->options['nodeBinary'] = $path;
+        return $this;
     }
 
     /**
-     * Get image content as base64
+     * Set NPM binary path
      *
-     * @return string
+     * @param string $path
+     * @return $this
      */
-    public function getImageBase64(): string
+    public function setNpmBinary(string $path): self
     {
-        return $this->prepareBrowsershot()
-            ->fullPage($this->options['fullPage'])
-            ->deviceScaleFactor($this->options['deviceScaleFactor'])
-            ->quality($this->options['quality'])
-            ->base64Screenshot();
+        $this->options['npmBinary'] = $path;
+        return $this;
     }
 
     /**
-     * Prepare Browsershot instance with common options
+     * Get content as base64
+     *
+     * @return string
+     */
+    public function getBase64(): string
+    {
+        $browsershot = $this->prepareBrowsershot();
+
+        if ($this->outputType === 'pdf') {
+            return $browsershot->base64pdf();
+        }
+
+        return $browsershot->base64Screenshot();
+    }
+
+    /**
+     * Get content as binary string
+     *
+     * @return string
+     */
+    public function getBinary(): string
+    {
+        $browsershot = $this->prepareBrowsershot();
+
+        if ($this->outputType === 'pdf') {
+            return $browsershot->pdf();
+        }
+
+        return $browsershot->screenshot();
+    }
+
+    /**
+     * Save PDF to file
+     * 
+     * @param string $path File path to save
+     * @param bool $overwrite Overwrite existing file
+     * @return array
+     */
+    public function savePdf(string $path, bool $overwrite = false): array
+    {
+        return $this->save($path, [
+            'type' => 'pdf',
+            'overwrite' => $overwrite
+        ]);
+    }
+
+    /**
+     * Save image to file
+     * 
+     * @param string $path File path to save
+     * @param string $type Image type (png, jpeg)
+     * @param bool $overwrite Overwrite existing file
+     * @return array
+     */
+    public function saveImage(string $path, string $type = 'png', bool $overwrite = false): array
+    {
+        return $this->save($path, [
+            'type' => $type,
+            'overwrite' => $overwrite
+        ]);
+    }
+
+    /**
+     * Save the output directly using Browsershot's save functionality
+     * 
+     * @param string $filePath Path to save the file
+     * @param array $options Save options:
+     *              - 'overwrite' => bool
+     *              - 'type' => 'pdf'|'png'|'jpeg'
+     * @return array
+     */
+    public function save(string $filePath, array $options = []): array
+    {
+        $defaultOptions = [
+            'overwrite' => false,
+            'type' => $this->outputType,
+        ];
+        
+        $options = array_merge($defaultOptions, $options);
+        
+        try {
+            // Check if file exists and overwrite is false
+            if (file_exists($filePath) && !$options['overwrite']) {
+                throw new \Exception("File already exists at path: {$filePath}");
+            }
+            
+            // Prepare the Browsershot instance
+            $browsershot = $this->prepareBrowsershot();
+            
+            // Determine save method based on type
+            switch ($options['type']) {
+                case 'pdf':
+                    $browsershot->save($filePath);
+                    $mimeType = 'application/pdf';
+                    break;
+                    
+                case 'png':
+                    $browsershot->save($filePath);
+                    $mimeType = 'image/png';
+                    break;
+                    
+                case 'jpeg':
+                case 'jpg':
+                    $browsershot->save($filePath);
+                    $mimeType = 'image/jpeg';
+                    break;
+                    
+                default:
+                    throw new \Exception("Unsupported file type: {$options['type']}");
+            }
+            
+            // Verify file was created
+            if (!file_exists($filePath)) {
+                throw new \Exception("Failed to save file to: {$filePath}");
+            }
+
+            $image_data = file_get_contents($filePath);
+            $base64string = base64_encode($image_data);
+            $fileSize = filesize($filePath);
+            unlink($filePath);
+            
+            return [
+                'path' => $filePath,
+                'size' => $fileSize,
+                'base64' => $base64string,
+                'mime_type' => $mimeType
+            ];
+        } catch (\Exception $e) {
+            // Clean up if file was partially created
+            if (isset($filePath) && file_exists($filePath)) {
+                unlink($filePath);
+            }
+            
+            return [
+                'status' => 'error',
+                'message' => $e->getMessage(),
+                'code' => $e->getCode()
+            ];
+        }
+    }
+
+    /**
+     * Prepare Browsershot instance with configured options
      *
      * @return Browsershot
      */
     protected function prepareBrowsershot(): Browsershot
     {
-        $browsershot = Browsershot::html($this->html)
+        $browsershot = $this->contentType === 'html' 
+            ? Browsershot::html($this->content)
+            : Browsershot::url($this->content);
+
+        $browsershot
+            ->setNodeBinary($this->options['nodeBinary'])
+            ->setNpmBinary($this->options['npmBinary'])
             ->timeout($this->options['timeout']);
 
         if ($this->options['noSandbox']) {
-            $browsershot->setOption('args', ['--no-sandbox'])
-                ->setOption('executablePath', '/usr/bin/chromium-browser');
+            $browsershot->addChromiumArguments(['no-sandbox']);
+        }
+
+        if ($this->outputType === 'pdf') {
+            $browsershot
+                ->format($this->options['format'])
+                ->landscape($this->options['landscape']);
+
+            if ($this->options['margin']) {
+                $browsershot->margins(
+                    $this->options['margin']['top'] ?? 0,
+                    $this->options['margin']['right'] ?? 0,
+                    $this->options['margin']['bottom'] ?? 0,
+                    $this->options['margin']['left'] ?? 0
+                );
+            }
+        } else {
+            $browsershot
+                ->fullPage($this->options['fullPage'])
+                ->deviceScaleFactor($this->options['deviceScaleFactor'])
+                ->quality($this->options['quality']);
         }
 
         return $browsershot;
