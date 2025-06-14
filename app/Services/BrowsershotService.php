@@ -85,8 +85,9 @@ class BrowsershotService
             
             // Set output type
             $type = $input['type'] ?? 'png';
-            if ($type === 'pdf') {
-                $generator->setOutputType('pdf');
+
+            if (!empty($input['type'])) {
+                $generator->setOutputType($input['type']);
             }
             
             // Apply options
@@ -132,46 +133,6 @@ class BrowsershotService
                 'data' => $result,
                 'code' => 200
             ];
-        } catch (Exception $e) {
-            return [
-                'status' => 'error',
-                'message' => $e->getMessage(),
-                'code' => $e->getCode()
-            ];
-        }
-    }
-    
-    /**
-     * Generate dan simpan ke file
-     */
-    public function generateToFile(array $input, string $filePath): array
-    {
-        try {
-            $result = $this->handleRequest($input);
-            
-            if ($result['status'] !== 'success') {
-                return $result;
-            }
-            
-            // Ekstrak base64 dari data URI
-            // $base64 = substr($result['data'], strpos($result['data'], ',') + 1);
-            // $binary = base64_decode($base64);
-            
-            // Simpan ke file
-            $dir = dirname($filePath);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-            
-            file_put_contents($filePath, $result['data']);
-            
-            return [
-                'status' => 'success',
-                'path' => $filePath,
-                // 'size' => strlen($binary),
-                'mime_type' => $result['mime_type']
-            ];
-            
         } catch (Exception $e) {
             return [
                 'status' => 'error',

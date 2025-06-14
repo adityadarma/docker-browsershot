@@ -70,8 +70,8 @@ class BrowsershotGenerator
      */
     public function setOutputType(string $type): self
     {
-        if (!in_array($type, ['pdf', 'image'])) {
-            throw new \InvalidArgumentException("Output type must be either 'pdf' or 'image'");
+        if (!in_array($type, ['pdf', 'png', 'jpeg', 'jpg'])) {
+            throw new \InvalidArgumentException("Output type must be either 'pdf', 'png', 'jpeg', 'jpg'");
         }
 
         $this->outputType = $type;
@@ -359,7 +359,7 @@ class BrowsershotGenerator
         if ($this->options['noSandbox']) {
             $browsershot->addChromiumArguments(['no-sandbox']);
         }
-
+        
         if ($this->outputType === 'pdf') {
             $browsershot
                 ->format($this->options['format'])
