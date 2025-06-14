@@ -8,6 +8,9 @@ services:
         ALPINE_VERSION: 3.21
         PHP_VERSION: 8.3
         PHP_NUMBER: 83
+        UID: ${UID}
+        GID: ${GID}
+        USERNAME: ${USERNAME}
     hostname: browsershot
     volumes:
       - ./:/app

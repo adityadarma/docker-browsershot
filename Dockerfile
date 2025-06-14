@@ -7,6 +7,9 @@ FROM alpine:${ALPINE_VERSION}
 
 ARG PHP_VERSION
 ARG PHP_NUMBER
+ARG UID
+ARG GID
+ARG USERNAME
 ENV TZ="Asia/Makassar"
 
 # Set label information
@@ -16,8 +19,12 @@ LABEL org.opencontainers.image.os="Alpine Linux ${ALPINE_VERSION}"
 LABEL org.opencontainers.image.php="${PHP_VERSION}"
 LABEL org.opencontainers.image.node="${NODE_VERSION}"
 
+# Setup document root for application
+WORKDIR /app
+
 # Install package
 RUN apk add --update --no-cache \
+    shadow \
     git \
     chromium \
     nss \
@@ -40,10 +47,12 @@ RUN apk add --update --no-cache \
     php${PHP_NUMBER}-openssl \
     php${PHP_NUMBER}-phar \
     php${PHP_NUMBER}-session \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/cache/apk/* \
+    && if [ ! -e /usr/bin/php ]; then ln -s /usr/bin/php${PHP_NUMBER} /usr/bin/php; fi
 
-# Symlink if not found
-RUN if [ ! -e /usr/bin/php ]; then ln -s /usr/bin/php${PHP_NUMBER} /usr/bin/php; fi
+# Add grup and user with UID/GID from host
+RUN getent group $GID || groupadd -g $GID $USERNAME && \
+    useradd -u $UID -g $GID -s /bin/sh -m $USERNAME
 
 # Install composer from the official image
 COPY --from=composer /usr/bin/composer /usr/bin/composer
