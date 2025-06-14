@@ -18,8 +18,10 @@ class BrowsershotGenerator
         'noSandbox' => true,
         'deviceScaleFactor' => 1,
         'quality' => 90,
-        'nodeBinary' => '',
-        'npmBinary' => ''
+        'nodeBinary' => '/usr/local/bin/node',
+        'npmBinary' => '/usr/local/bin/npm',
+        'executablePath' => '/usr/bin/chromium-browser',
+        'includePath' => '',
     ];
 
     /**
@@ -35,11 +37,8 @@ class BrowsershotGenerator
         // Ambil path binary dari environment jika ada
         $this->options['nodeBinary'] = getenv('NODE_BINARY_PATH') ?: $this->options['nodeBinary'];
         $this->options['npmBinary'] = getenv('NPM_BINARY_PATH') ?: $this->options['npmBinary'];
-        
-        // Optional: Ambil chromium path jika ada
-        if (getenv('CHROMIUM_BINARY_PATH')) {
-            $this->options['executablePath'] = getenv('CHROMIUM_BINARY_PATH');
-        }
+        $this->options['includePath'] = getenv('INCLUDE_PATH') ?: $this->options['includePath'];
+        $this->options['executablePath'] = getenv('CHROMIUM_BINARY_PATH') ?: $this->options['executablePath'];
     }
 
     /**
@@ -354,10 +353,15 @@ class BrowsershotGenerator
         $browsershot
             ->setNodeBinary($this->options['nodeBinary'])
             ->setNpmBinary($this->options['npmBinary'])
+            ->setChromePath($this->options['executablePath'])
             ->timeout($this->options['timeout']);
 
         if ($this->options['noSandbox']) {
             $browsershot->addChromiumArguments(['no-sandbox']);
+        }
+
+        if ($this->options['includePath']) {
+            $browsershot->setIncludePath($this->options['includePath']);
         }
         
         if ($this->outputType === 'pdf') {
