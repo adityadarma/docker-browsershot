@@ -6,14 +6,13 @@ services:
       dockerfile: Dockerfile
       args:
         ALPINE_VERSION: 3.21
-        PHP_VERSION: 8.3
-        PHP_NUMBER: 83
-        UID: ${UID}
-        GID: ${GID}
-        USERNAME: ${USERNAME}
+        PHP_VERSION: 8.4
+        PHP_NUMBER: 84
+        NODE_VERSION: 22
     hostname: browsershot
     volumes:
       - ./:/app
     ports:
       - "8000:8000"
     restart: unless-stopped
+    network_mode: internet # Optional

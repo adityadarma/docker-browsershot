@@ -21,7 +21,7 @@ class BrowsershotGenerator
         'nodeBinary' => '/usr/local/bin/node',
         'npmBinary' => '/usr/local/bin/npm',
         'executablePath' => '/usr/bin/chromium-browser',
-        'includePath' => '',
+        'includePath' => '$PATH:/usr/local/bin',
     ];
 
     /**
@@ -320,10 +320,12 @@ class BrowsershotGenerator
             unlink($filePath);
             
             return [
-                'path' => $filePath,
-                'size' => $fileSize,
-                'base64' => $base64string,
-                'mime_type' => $mimeType
+                'data' => [
+                    'path' => $filePath,
+                    'size' => $fileSize,
+                    'base64' => $base64string,
+                    'mime_type' => $mimeType
+                ]
             ];
         } catch (\Exception $e) {
             // Clean up if file was partially created
@@ -334,7 +336,7 @@ class BrowsershotGenerator
             return [
                 'status' => 'error',
                 'message' => $e->getMessage(),
-                'code' => $e->getCode()
+                'code' => 500
             ];
         }
     }
@@ -353,6 +355,16 @@ class BrowsershotGenerator
         $browsershot
             ->setNodeBinary($this->options['nodeBinary'])
             ->setNpmBinary($this->options['npmBinary'])
+            ->setOption('args', [
+                '--headless=new',
+                '--disable-gpu',
+                '--disable-software-rasterizer',
+                '--disable-dev-shm-usage',
+                '--disable-features=Crashpad',
+                '--disable-extensions',
+                '--no-zygote',
+                '--mute-audio'
+            ])
             ->timeout($this->options['timeout']);
 
         if ($this->options['executablePath']) {

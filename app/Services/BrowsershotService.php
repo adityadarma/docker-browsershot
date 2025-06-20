@@ -128,11 +128,10 @@ class BrowsershotService
                 $result = $generator->saveImage($filePath, $type);
             }
 
-            return [
+            return array_merge([
                 'status' => 'success',
-                'data' => $result,
                 'code' => 200
-            ];
+            ], $result);
         } catch (Exception $e) {
             return [
                 'status' => 'error',
