@@ -353,8 +353,11 @@ class BrowsershotGenerator
         $browsershot
             ->setNodeBinary($this->options['nodeBinary'])
             ->setNpmBinary($this->options['npmBinary'])
-            // ->setChromePath($this->options['executablePath'])
             ->timeout($this->options['timeout']);
+
+        if ($this->options['executablePath']) {
+            $browsershot->setChromePath($this->options['executablePath']);
+        }
 
         if ($this->options['noSandbox']) {
             $browsershot->addChromiumArguments(['no-sandbox']);
