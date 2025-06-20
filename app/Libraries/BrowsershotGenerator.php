@@ -35,10 +35,10 @@ class BrowsershotGenerator
         $this->setContent($content, $type);
 
         // Ambil path binary dari environment jika ada
-        $this->options['nodeBinary'] = getenv('NODE_BINARY_PATH') ?: $this->options['nodeBinary'];
-        $this->options['npmBinary'] = getenv('NPM_BINARY_PATH') ?: $this->options['npmBinary'];
-        $this->options['includePath'] = getenv('INCLUDE_PATH') ?: $this->options['includePath'];
-        $this->options['executablePath'] = getenv('CHROMIUM_BINARY_PATH') ?: $this->options['executablePath'];
+        $this->options['nodeBinary'] = $_ENV['NODE_BINARY_PATH'] ?: $this->options['nodeBinary'];
+        $this->options['npmBinary'] = $_ENV['NPM_BINARY_PATH'] ?: $this->options['npmBinary'];
+        $this->options['includePath'] = $_ENV['INCLUDE_PATH'] ?: $this->options['includePath'];
+        $this->options['executablePath'] = $_ENV['CHROMIUM_BINARY_PATH'] ?: $this->options['executablePath'];
     }
 
     /**
@@ -353,7 +353,7 @@ class BrowsershotGenerator
         $browsershot
             ->setNodeBinary($this->options['nodeBinary'])
             ->setNpmBinary($this->options['npmBinary'])
-            ->setChromePath($this->options['executablePath'])
+            // ->setChromePath($this->options['executablePath'])
             ->timeout($this->options['timeout']);
 
         if ($this->options['noSandbox']) {
