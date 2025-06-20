@@ -9,6 +9,9 @@ services:
         PHP_VERSION: 8.4
         PHP_NUMBER: 84
         NODE_VERSION: 22
+        UID: ${UID}
+        GID: ${GID}
+        USERNAME: ${USERNAME}
     hostname: browsershot
     volumes:
       - ./:/app
@@ -16,3 +19,6 @@ services:
       - "8000:8000"
     restart: unless-stopped
     network_mode: internet # Optional
+    mem_limit: 1024m       # Maksimum RAM
+    mem_reservation: 512m  # Memori minimal yang ingin dicadangkan
+    cpus: 1                # Maksimum 100% CPU

@@ -7,6 +7,9 @@ FROM alpine:${ALPINE_VERSION}
 
 ARG PHP_VERSION
 ARG PHP_NUMBER
+ARG UID
+ARG GID
+ARG USERNAME
 ENV TZ="Asia/Makassar"
 
 # Set label information
@@ -21,13 +24,14 @@ WORKDIR /app
 
 # Install package
 RUN apk add --update --no-cache \
-    git \
+    shadow \
+    tzdata \
     curl \
+    git \
     nano \
     nginx \
     supervisor \
     gettext \
-    tzdata \
     chromium \
     nss \
     freetype \
@@ -47,6 +51,10 @@ RUN apk add --update --no-cache \
     php${PHP_NUMBER}-session \
     && rm -rf /var/cache/apk/* \
     && if [ ! -e /usr/bin/php ]; then ln -s /usr/bin/php${PHP_NUMBER} /usr/bin/php; fi
+
+# Add grup and user with UID/GID from host
+RUN getent group $GID || groupadd -g $GID $USERNAME && \
+    useradd -u $UID -g $GID -s /bin/sh -m $USERNAME
 
 # Install composer from the official image
 COPY --from=composer /usr/bin/composer /usr/bin/composer
