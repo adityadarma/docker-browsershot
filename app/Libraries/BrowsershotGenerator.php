@@ -18,8 +18,8 @@ class BrowsershotGenerator
         'noSandbox' => true,
         'deviceScaleFactor' => 1,
         'quality' => 90,
-        'nodeBinary' => '/usr/local/bin/node',
-        'npmBinary' => '/usr/local/bin/npm',
+        'nodeBinary' => '/usr/bin/node',
+        'npmBinary' => '/usr/bin/npm',
         'executablePath' => '/usr/bin/chromium-browser',
         'includePath' => '$PATH:/usr/local/bin',
     ];
@@ -317,7 +317,7 @@ class BrowsershotGenerator
             $image_data = file_get_contents($filePath);
             $base64string = base64_encode($image_data);
             $fileSize = filesize($filePath);
-            unlink($filePath);
+            // unlink($filePath);
             
             return [
                 'data' => [
@@ -358,13 +358,13 @@ class BrowsershotGenerator
             ->setOption('args', [
                 '--headless=new',
                 '--disable-gpu',
-                '--disable-software-rasterizer',
                 '--disable-dev-shm-usage',
                 '--disable-features=Crashpad',
                 '--disable-extensions',
                 '--no-zygote',
                 '--mute-audio'
             ])
+            ->setOption('userDataDir', '/tmp/chrome-user')
             ->timeout($this->options['timeout']);
 
         if ($this->options['executablePath']) {

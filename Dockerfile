@@ -1,7 +1,4 @@
 ARG ALPINE_VERSION
-ARG NODE_VERSION
-
-FROM node:${NODE_VERSION}-alpine AS node
 
 FROM alpine:${ALPINE_VERSION}
 
@@ -17,7 +14,7 @@ LABEL org.opencontainers.image.maintainer="Aditya Darma <me@adityadarma.dev>"
 LABEL org.opencontainers.image.description="Browsershot base on PHP."
 LABEL org.opencontainers.image.os="Alpine Linux ${ALPINE_VERSION}"
 LABEL org.opencontainers.image.php="${PHP_VERSION}"
-LABEL org.opencontainers.image.node="${NODE_VERSION}"
+LABEL org.opencontainers.image.node="22"
 
 # Setup document root for application
 WORKDIR /app
@@ -32,6 +29,8 @@ RUN apk add --update --no-cache \
     nginx \
     supervisor \
     gettext \
+    nodejs \
+    npm \
     chromium \
     nss \
     freetype \
@@ -59,12 +58,6 @@ RUN getent group $GID || groupadd -g $GID $USERNAME && \
 # Install composer from the official image
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 
-# Install node from the official image
-COPY --from=node /usr/lib /usr/lib
-COPY --from=node /usr/local/lib /usr/local/lib
-COPY --from=node /usr/local/include /usr/local/include
-COPY --from=node /usr/local/bin /usr/local/bin
-
 # Copy file configurator
 COPY .docker/www.conf /etc/php${PHP_NUMBER}/php-fpm.d/www.conf
 COPY .docker/php.ini /etc/php${PHP_NUMBER}/conf.d/custom.ini
@@ -78,7 +71,9 @@ WORKDIR /app
 # Replace string and make sure files/folders needed by the processes are accessable when they run under the nobody user
 RUN sed -i "s|command=php-fpm -F|command=php-fpm${PHP_NUMBER} -F|g" /etc/supervisord.conf.template && \
     chmod +x /entrypoint.sh && \
-    git config --system --add safe.directory /app
+    git config --system --add safe.directory /app && \
+    mkdir -p /tmp/chrome-user && \
+    chmod -R 777 /tmp/chrome-user
 
 RUN npm install -g puppeteer && rm -rf /root/.cache /root/.npm
 
