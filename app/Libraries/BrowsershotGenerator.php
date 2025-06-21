@@ -317,7 +317,7 @@ class BrowsershotGenerator
             $image_data = file_get_contents($filePath);
             $base64string = base64_encode($image_data);
             $fileSize = filesize($filePath);
-            // unlink($filePath);
+            unlink($filePath);
             
             return [
                 'data' => [
