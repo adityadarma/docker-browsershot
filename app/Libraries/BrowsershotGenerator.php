@@ -2,6 +2,7 @@
 
 namespace App\Libraries;
 
+use Exception;
 use Spatie\Browsershot\Browsershot;
 
 class BrowsershotGenerator
@@ -281,7 +282,7 @@ class BrowsershotGenerator
         try {
             // Check if file exists and overwrite is false
             if (file_exists($filePath) && !$options['overwrite']) {
-                throw new \Exception("File already exists at path: {$filePath}");
+                throw new Exception("File already exists at path: {$filePath}");
             }
             
             // Prepare the Browsershot instance
@@ -306,18 +307,17 @@ class BrowsershotGenerator
                     break;
                     
                 default:
-                    throw new \Exception("Unsupported file type: {$options['type']}");
+                    throw new Exception("Unsupported file type: {$options['type']}");
             }
             
             // Verify file was created
             if (!file_exists($filePath)) {
-                throw new \Exception("Failed to save file to: {$filePath}");
+                throw new Exception("Failed to save file to: {$filePath}");
             }
 
             $image_data = file_get_contents($filePath);
             $base64string = base64_encode($image_data);
             $fileSize = filesize($filePath);
-            unlink($filePath);
             
             return [
                 'data' => [
@@ -327,22 +327,19 @@ class BrowsershotGenerator
                     'mime_type' => $mimeType
                 ]
             ];
-        } catch (\Exception $e) {
-            // Clean up if file was partially created
-            if (isset($filePath) && file_exists($filePath)) {
-                unlink($filePath);
-            }
-            
+        } catch (Exception $e) {
             return [
                 'status' => 'error',
                 'message' => $e->getMessage(),
                 'code' => 500
             ];
+        } finally {
+            unlink($filePath);
         }
     }
 
     /**
-     * Prepare Browsershot instance with configured options
+     * Prepare a Browsershot instance with configured options
      *
      * @return Browsershot
      */
@@ -394,9 +391,9 @@ class BrowsershotGenerator
             }
         } else {
             $browsershot
-                ->fullPage($this->options['fullPage'])
+                ->fullPage()
                 ->deviceScaleFactor($this->options['deviceScaleFactor'])
-                ->quality($this->options['quality']);
+                ->setScreenshotType($this->outputType, $this->options['quality']);
         }
 
         return $browsershot;
