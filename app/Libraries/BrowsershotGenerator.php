@@ -392,8 +392,8 @@ class BrowsershotGenerator
         } else {
             $browsershot
                 ->fullPage()
-                ->deviceScaleFactor($this->options['deviceScaleFactor'])
-                ->setScreenshotType($this->outputType, $this->options['quality']);
+                ->deviceScaleFactor($this->options['deviceScaleFactor']);
+                // ->setScreenshotType($this->outputType, $this->options['quality']);
         }
 
         return $browsershot;
