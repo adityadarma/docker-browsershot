@@ -11,7 +11,7 @@ LABEL org.opencontainers.image.maintainer="Aditya Darma <me@adityadarma.dev>"
 LABEL org.opencontainers.image.description="Browsershot base on PHP."
 LABEL org.opencontainers.image.os="Alpine Linux 3.22"
 LABEL org.opencontainers.image.php="PHP 8.4"
-LABEL org.opencontainers.image.node="Nodejs 22"
+LABEL org.opencontainers.image.node="NodeJS 22"
 
 # Setup document root for application
 WORKDIR /app
@@ -61,6 +61,7 @@ RUN chmod +x /entrypoint.sh && \
     chmod -R 777 /tmp/chrome-user
 
 RUN npm install -g puppeteer && rm -rf /root/.cache /root/.npm
+RUN composer install --no-dev --optimize-autoloader
 
 # Expose the port nginx is reachable on
 EXPOSE 8000

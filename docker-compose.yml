@@ -5,6 +5,7 @@ services:
     hostname: browsershot
     # environment:
     #   - APP_KEY=your_app_key_here
+    #   - APP_DEBUG=true
     ports:
       - "8000:8000"
     restart: unless-stopped
