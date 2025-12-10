@@ -15,12 +15,12 @@ LABEL org.opencontainers.image.node="Nodejs 22"
 
 # Setup document root for application
 WORKDIR /app
+COPY ./ /app/
 
 # Install package
 RUN apk add --update --no-cache \
     shadow \
     tzdata \
-    git \
     nginx \
     multirun \
     gettext \
@@ -63,12 +63,8 @@ COPY .docker/php.ini /etc/php${PHP_NUMBER}/conf.d/custom.ini
 COPY .docker/nginx.conf /etc/nginx/nginx.conf
 COPY .docker/entrypoint.sh /entrypoint.sh
 
-# Setup document root for application
-WORKDIR /app
-
 # Replace string and make sure files/folders needed by the processes are accessable when they run under the nobody user
 RUN chmod +x /entrypoint.sh && \
-    git config --system --add safe.directory /app && \
     mkdir -p /tmp/chrome-user && \
     chmod -R 777 /tmp/chrome-user
 

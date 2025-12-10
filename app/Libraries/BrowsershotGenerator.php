@@ -34,12 +34,6 @@ class BrowsershotGenerator
     public function __construct(string $content = '', string $type = 'html')
     {
         $this->setContent($content, $type);
-
-        // Ambil path binary dari environment jika ada
-        $this->options['nodeBinary'] = $_ENV['NODE_BINARY_PATH'] ?: $this->options['nodeBinary'];
-        $this->options['npmBinary'] = $_ENV['NPM_BINARY_PATH'] ?: $this->options['npmBinary'];
-        $this->options['includePath'] = $_ENV['INCLUDE_PATH'] ?: $this->options['includePath'];
-        $this->options['executablePath'] = $_ENV['CHROMIUM_BINARY_PATH'] ?: $this->options['executablePath'];
     }
 
     /**
