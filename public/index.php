@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
-// Load environment variables
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->load();
-
 // Set default headers
 header('Content-Type: application/json');
 
@@ -16,13 +12,14 @@ header('Content-Type: application/json');
  */
 function checkAppKey(): void
 {
-    $headers = getallheaders();
-    $validAppKey = $_ENV['APP_KEY'] ?? '';
-
-    if (!isset($headers['App-Key']) || $headers['App-Key'] !== $validAppKey) {
-        http_response_code(401);
-        echo json_encode(['status' => 'error', 'message' => 'Unauthorized: Invalid App-Key']);
-        exit;
+    $validAppKey = getenv('APP_KEY');
+    if ($validAppKey) {
+        $headers = getallheaders();
+        if (!isset($headers['App-Key']) || $headers['App-Key'] !== $validAppKey) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => 'Unauthorized: Invalid App-Key']);
+            exit;
+        }
     }
 }
 
@@ -50,12 +47,15 @@ function handleRequest(): void
     $method = $_SERVER['REQUEST_METHOD'];
     $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-    // Middleware
-    checkAppKey();
-
     // Route handling
-    if ($method === 'POST' && $uri === '/') {
+    if ($method === 'GET' && $uri === '/') {
+        // Middleware
+        checkAppKey();
+
         processBrowsershotRequest();
+    } elseif ($method === 'GET' && $uri === '/health') {
+        http_response_code(200);
+        echo json_encode(['status' => 'success', 'message' => 'Server up and running']);
     } else {
         http_response_code(404);
         echo json_encode(['status' => 'error', 'message' => 'Endpoint not found']);

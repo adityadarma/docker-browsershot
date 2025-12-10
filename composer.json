@@ -13,8 +13,7 @@
     ],
     "require": {
         "php": "^8.4",
-        "spatie/browsershot": "^5.0",
-        "vlucas/phpdotenv": "^5.6"
+        "spatie/browsershot": "^5.0"
     }
     ,
     "require-dev": {

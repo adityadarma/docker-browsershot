@@ -1,0 +1,10 @@
+services:
+  app:
+    image: adityadarma/docker-browsershot:latest
+    container_name: browsershot
+    hostname: browsershot
+    environment:
+      # - APP_KEY=
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

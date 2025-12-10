@@ -1,20 +1,17 @@
-ARG ALPINE_VERSION
+FROM alpine:3.22
 
-FROM alpine:${ALPINE_VERSION}
-
-ARG PHP_VERSION
-ARG PHP_NUMBER
+ARG PHP_NUMBER=84
 ARG UID
 ARG GID
 ARG USERNAME
-ENV TZ="Asia/Makassar"
+ENV TZ="UTC"
 
 # Set label information
 LABEL org.opencontainers.image.maintainer="Aditya Darma <me@adityadarma.dev>"
 LABEL org.opencontainers.image.description="Browsershot base on PHP."
-LABEL org.opencontainers.image.os="Alpine Linux ${ALPINE_VERSION}"
-LABEL org.opencontainers.image.php="${PHP_VERSION}"
-LABEL org.opencontainers.image.node="22"
+LABEL org.opencontainers.image.os="Alpine Linux 3.22"
+LABEL org.opencontainers.image.php="PHP 8.4"
+LABEL org.opencontainers.image.node="Nodejs 22"
 
 # Setup document root for application
 WORKDIR /app
@@ -23,11 +20,9 @@ WORKDIR /app
 RUN apk add --update --no-cache \
     shadow \
     tzdata \
-    curl \
     git \
-    nano \
     nginx \
-    supervisor \
+    multirun \
     gettext \
     nodejs \
     npm \
@@ -52,8 +47,12 @@ RUN apk add --update --no-cache \
     && if [ ! -e /usr/bin/php ]; then ln -s /usr/bin/php${PHP_NUMBER} /usr/bin/php; fi
 
 # Add grup and user with UID/GID from host
-RUN getent group $GID || groupadd -g $GID $USERNAME && \
-    useradd -u $UID -g $GID -s /bin/sh -m $USERNAME
+RUN if [ -n "$UID" ] && [ -n "$GID" ] && [ -n "$USERNAME" ]; then \
+      ( getent group "$GID" || groupadd -g "$GID" "$USERNAME" ) && \
+      useradd -u "$UID" -g "$GID" -s /bin/sh -m "$USERNAME"; \
+    else \
+      echo "Skipping user/group creation because UID or GID is empty"; \
+    fi
 
 # Install composer from the official image
 COPY --from=composer /usr/bin/composer /usr/bin/composer
@@ -62,15 +61,13 @@ COPY --from=composer /usr/bin/composer /usr/bin/composer
 COPY .docker/www.conf /etc/php${PHP_NUMBER}/php-fpm.d/www.conf
 COPY .docker/php.ini /etc/php${PHP_NUMBER}/conf.d/custom.ini
 COPY .docker/nginx.conf /etc/nginx/nginx.conf
-COPY .docker/supervisord.conf.template /etc/supervisord.conf.template
 COPY .docker/entrypoint.sh /entrypoint.sh
 
 # Setup document root for application
 WORKDIR /app
 
 # Replace string and make sure files/folders needed by the processes are accessable when they run under the nobody user
-RUN sed -i "s|command=php-fpm -F|command=php-fpm${PHP_NUMBER} -F|g" /etc/supervisord.conf.template && \
-    chmod +x /entrypoint.sh && \
+RUN chmod +x /entrypoint.sh && \
     git config --system --add safe.directory /app && \
     mkdir -p /tmp/chrome-user && \
     chmod -R 777 /tmp/chrome-user
