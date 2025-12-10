@@ -48,7 +48,7 @@ function handleRequest(): void
     $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
     // Route handling
-    if ($method === 'GET' && $uri === '/') {
+    if ($method === 'POST' && $uri === '/') {
         // Middleware
         checkAppKey();
 
