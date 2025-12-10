@@ -46,14 +46,6 @@ RUN apk add --update --no-cache \
     && rm -rf /var/cache/apk/* \
     && if [ ! -e /usr/bin/php ]; then ln -s /usr/bin/php${PHP_NUMBER} /usr/bin/php; fi
 
-# Add grup and user with UID/GID from host
-RUN if [ -n "$UID" ] && [ -n "$GID" ] && [ -n "$USERNAME" ]; then \
-      ( getent group "$GID" || groupadd -g "$GID" "$USERNAME" ) && \
-      useradd -u "$UID" -g "$GID" -s /bin/sh -m "$USERNAME"; \
-    else \
-      echo "Skipping user/group creation because UID or GID is empty"; \
-    fi
-
 # Install composer from the official image
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 
