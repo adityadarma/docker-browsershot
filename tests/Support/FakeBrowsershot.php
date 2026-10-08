@@ -16,6 +16,9 @@ class FakeBrowsershot extends Browsershot
     /** @var list<array> */
     public array $commands = [];
 
+    /** @var list<string> Shell command lines, captured at call time like the real callBrowser(). */
+    public array $shellCommands = [];
+
     /** Raw output returned by browser.cjs (decoded JSON). */
     public array $output = ['result' => ''];
 
@@ -25,6 +28,11 @@ class FakeBrowsershot extends Browsershot
     protected function callBrowser(array $command): string
     {
         $this->commands[] = $command;
+
+        // Build the shell line now: it may create temp files (writeOptionsToFile)
+        // inside the per-request work dir, which is removed after the render.
+        $this->shellCommands[] = (string) $this->getFullCommand($command);
+        $this->cleanupTemporaryOptionsFile();
 
         if ($this->throw !== null) {
             throw $this->throw;
@@ -40,9 +48,19 @@ class FakeBrowsershot extends Browsershot
         return $this->commands[array_key_last($this->commands)];
     }
 
-    /** Expose Spatie's shell command builder for assertions. */
+    /**
+     * Shell command line Spatie would execute. Returns the one captured during
+     * the last browser call; falls back to building it for commands that were
+     * never executed.
+     */
     public function fullCommand(array $command): string
     {
-        return $this->getFullCommand($command);
+        $index = array_search($command, $this->commands, true);
+
+        if ($index !== false && isset($this->shellCommands[$index])) {
+            return $this->shellCommands[$index];
+        }
+
+        return (string) $this->getFullCommand($command);
     }
 }

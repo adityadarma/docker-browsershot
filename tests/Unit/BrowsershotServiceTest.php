@@ -14,6 +14,7 @@ use Spatie\Browsershot\Exceptions\ElementNotFound;
 use Spatie\Browsershot\Exceptions\RemoteConnectionException;
 use Spatie\Browsershot\Exceptions\UnsuccessfulResponse;
 use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use Tests\Support\FakeBrowsershot;
@@ -51,8 +52,8 @@ final class BrowsershotServiceTest extends TestCase
 
         $this->assertSame('error', $result['status']);
         $this->assertSame(422, $result['code']);
-        $this->assertContains('Param html atau url harus diisi', $result['errors']);
-        $this->assertStringContainsString('Type harus salah satu dari', $result['message']);
+        $this->assertContains('Either html or url is required', $result['errors']);
+        $this->assertStringContainsString('type must be one of', $result['message']);
         $this->assertSame([], $this->fake->commands, 'browser must not be called on invalid input');
     }
 
@@ -73,7 +74,7 @@ final class BrowsershotServiceTest extends TestCase
             'unsuccessful response' => [UnsuccessfulResponse::make('https://example.com', 404), 502, 'responds with code 404'],
             'remote connection' => [RemoteConnectionException::make('refused'), 502, 'Failed to connect to remote browser'],
             'timeout' => [new ProcessTimedOutException($process, ProcessTimedOutException::TYPE_GENERAL), 504, 'Browser timeout'],
-            'empty output' => [CouldNotTakeBrowsershot::chromeOutputEmpty('x.png', ''), 500, 'Browser gagal memproses permintaan'],
+            'empty output' => [CouldNotTakeBrowsershot::chromeOutputEmpty('x.png', ''), 500, 'Browser failed to process the request'],
             'unexpected' => [new \LogicException('secret detail'), 500, 'Internal server error'],
         ];
     }
@@ -102,8 +103,42 @@ final class BrowsershotServiceTest extends TestCase
         $result = $service->handleRequest(['url' => 'https://example.com']);
 
         $this->assertSame(500, $result['code']);
-        $this->assertSame('Browser gagal memproses permintaan', $result['message']);
+        $this->assertSame('Browser failed to process the request', $result['message']);
         $this->assertArrayNotHasKey('error', $result);
+    }
+
+    public function test_guard_deadline_exit_code_is_mapped_to_504(): void
+    {
+        // bin/browser-guard.cjs exits 124 when the render deadline is hit.
+        $process = new Process(['php', '-r', 'exit(124);']);
+        $process->run();
+
+        $service = $this->service();
+        $this->fake->throw = new ProcessFailedException($process);
+
+        $result = $service->handleRequest(['url' => 'https://example.com']);
+
+        $this->assertSame(504, $result['code']);
+        $this->assertSame('Browser timeout', $result['message']);
+    }
+
+    public function test_killed_browser_process_is_mapped_to_500(): void
+    {
+        // A child that SIGKILLs itself, like the OOM killer would. Symfony throws
+        // ProcessSignaledException from run() itself; reuse that real exception.
+        try {
+            (new Process(['sh', '-c', 'kill -9 $$']))->run();
+            $this->fail('Expected ProcessSignaledException');
+        } catch (ProcessSignaledException $signaled) {
+        }
+
+        $service = $this->service();
+        $this->fake->throw = $signaled;
+
+        $result = $service->handleRequest(['url' => 'https://example.com']);
+
+        $this->assertSame(500, $result['code']);
+        $this->assertSame('Browser process was killed', $result['message']);
     }
 
     public function test_internal_details_are_hidden_without_debug(): void

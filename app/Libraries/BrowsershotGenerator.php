@@ -80,6 +80,56 @@ class BrowsershotGenerator
     public function run(array $request): array
     {
         $browsershot = $this->build($request);
+        $workDir = $this->attachWorkDir($browsershot, $request);
+
+        try {
+            return $this->execute($browsershot, $request);
+        } finally {
+            // Kill anything still using the work dir (e.g. Chromium after node was
+            // SIGKILLed), wait for it to exit, then remove the dir.
+            RenderCleanup::run($workDir);
+        }
+    }
+
+    /** Milliseconds the node guard gets before PHP's own process timeout fires. */
+    public const DEADLINE_MARGIN_MS = 1500;
+
+    /**
+     * Give every render a private temp dir for the HTML file, the Chromium
+     * profile and Chromium's own temp files, so a crashed or killed render
+     * leaves nothing behind once the dir is removed.
+     */
+    private function attachWorkDir(Browsershot $browsershot, array $request): string
+    {
+        $base = rtrim($this->config['tempPath'] ?? '' ?: sys_get_temp_dir(), DIRECTORY_SEPARATOR);
+        $workDir = $base.DIRECTORY_SEPARATOR.'browsershot-'.bin2hex(random_bytes(8));
+
+        if (! mkdir($workDir, 0700, true) && ! is_dir($workDir)) {
+            throw new \RuntimeException("Cannot create work dir {$workDir}");
+        }
+
+        // Spatie writes the temporary index.html here.
+        $browsershot->setCustomTempPath($workDir);
+
+        $timeout = (int) ($request['options']['timeout'] ?? $this->config['timeout'] ?? 60);
+
+        $browsershot->setNodeEnv([
+            // Puppeteer's temp profile and Chromium's temp files follow TMPDIR.
+            'TMPDIR' => $workDir,
+            'BROWSERSHOT_WORKDIR' => $workDir,
+            'BROWSERSHOT_DEADLINE_MS' => (string) max(1000, $timeout * 1000 - self::DEADLINE_MARGIN_MS),
+        ]);
+
+        return $workDir;
+    }
+
+    public static function removeDirectory(string $path): void
+    {
+        RenderCleanup::removeDirectory($path);
+    }
+
+    private function execute(Browsershot $browsershot, array $request): array
+    {
         $action = $request['action'] ?? 'render';
         $type = $request['type'] ?? 'png';
 
@@ -138,8 +188,12 @@ class BrowsershotGenerator
             $browsershot->setIncludePath($config['includePath']);
         }
 
-        if (! empty($config['tempPath'])) {
-            $browsershot->setCustomTempPath($config['tempPath']);
+        if (! empty($config['binPath'])) {
+            $browsershot->setBinPath($config['binPath']);
+        }
+
+        if ($config['usePipe'] ?? false) {
+            $browsershot->usePipe();
         }
 
         if (! empty($config['chromiumArguments'])) {

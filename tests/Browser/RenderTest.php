@@ -9,6 +9,7 @@ use App\Services\BrowsershotService;
 use App\Services\RequestValidator;
 use App\Support\Config;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\Process;
 
 /**
  * Real Node + Puppeteer + Chrome. Mirrors the rendering cases in spatie's
@@ -391,7 +392,68 @@ final class RenderTest extends TestCase
         ]);
 
         $this->assertSame('error', $result['status']);
-        $this->assertContains($result['code'], [500, 504]);
+        $this->assertSame(504, $result['code']);
+    }
+
+    public function test_hung_render_leaves_no_browser_or_temp_files(): void
+    {
+        $before = self::chromeProfilePids();
+
+        $start = microtime(true);
+        $result = $this->handle([
+            'html' => '<p>x</p>',
+            'waitForFunction' => ['function' => 'false', 'timeout' => 0],
+            'timeout' => 3,
+        ]);
+
+        $this->assertSame(504, $result['code']);
+        $this->assertLessThan(5, microtime(true) - $start, 'guard must stop the render before PHP times out');
+
+        usleep(500_000);
+        $this->assertSame([], array_values(array_diff(self::chromeProfilePids(), $before)), 'Chromium survived the timeout');
+        $this->assertSame([], glob(sys_get_temp_dir().'/browsershot-*'), 'work dir left behind');
+    }
+
+    public function test_infinite_javascript_loop_is_killed(): void
+    {
+        $before = self::chromeProfilePids();
+
+        $result = $this->handle(['html' => '<script>while (true) {}</script>', 'timeout' => 3]);
+
+        $this->assertSame(504, $result['code']);
+
+        usleep(500_000);
+        $this->assertSame([], array_values(array_diff(self::chromeProfilePids(), $before)));
+    }
+
+    public function test_node_killed_mid_render_leaves_no_browser_or_temp_files(): void
+    {
+        $before = self::chromeProfilePids();
+
+        // SIGKILL the node guard while Chromium is running, so the guard itself
+        // cannot clean up. PHP must still kill Chromium and remove the work dir.
+        $killer = Process::fromShellCommandline('sleep 2; pkill -9 -f "[b]rowser-guard.cjs"');
+        $killer->start();
+
+        $result = $this->handle([
+            'html' => '<p>x</p>',
+            'waitForFunction' => ['function' => 'false', 'timeout' => 0],
+            'timeout' => 20,
+        ]);
+        $killer->wait();
+
+        $this->assertSame(500, $result['code']);
+        $this->assertSame('Browser process was killed', $result['message']);
+        $this->assertSame([], array_values(array_diff(self::chromeProfilePids(), $before)), 'Chromium survived node being killed');
+        $this->assertSame([], glob(sys_get_temp_dir().'/browsershot-*'), 'work dir left behind');
+    }
+
+    /** @return list<int> PIDs of Chromium browsers started by Puppeteer. */
+    private static function chromeProfilePids(): array
+    {
+        $out = trim((string) shell_exec('pgrep -f "user-data-dir=.*puppeteer_dev_chrome_profile" 2>/dev/null'));
+
+        return $out === '' ? [] : array_map('intval', explode("\n", $out));
     }
 
     // ----------------------------------------------------------- helpers

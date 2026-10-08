@@ -114,7 +114,7 @@ final class ApiTest extends TestCase
         [$status, $body] = $this->post('');
 
         $this->assertSame(422, $status);
-        $this->assertContains('Param html atau url harus diisi', $body['errors']);
+        $this->assertContains('Either html or url is required', $body['errors']);
     }
 
     // ----------------------------------------------------------- render

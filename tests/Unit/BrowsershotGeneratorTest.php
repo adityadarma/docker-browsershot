@@ -466,6 +466,76 @@ final class BrowsershotGeneratorTest extends TestCase
         $this->assertSame(1, count(array_keys($args, '--no-sandbox')), 'no-sandbox must not be duplicated');
     }
 
+    public function test_uses_guard_binary_and_pipe_by_default(): void
+    {
+        $generator = $this->generator(Config::browsershot());
+        $this->fake->output = ['result' => 'QUJD'];
+        $generator->run((new RequestValidator)->validate(['url' => 'https://example.com']));
+
+        $command = $this->fake->lastCommand();
+        $shell = $this->fake->fullCommand($command);
+
+        $this->assertTrue($command['options']['pipe'], 'pipe makes Chromium exit when node dies');
+        $this->assertStringContainsString('bin/browser-guard.cjs', $shell);
+        $this->assertFileExists(dirname(__DIR__, 2).'/bin/browser-guard.cjs');
+    }
+
+    public function test_each_render_gets_a_private_work_dir_and_deadline(): void
+    {
+        $this->execute(['url' => 'https://example.com', 'timeout' => 10]);
+
+        $shell = $this->fake->fullCommand($this->fake->lastCommand());
+
+        $this->assertMatchesRegularExpression("#TMPDIR='[^']*/browsershot-[0-9a-f]{16}'#", $shell);
+        $this->assertMatchesRegularExpression("#BROWSERSHOT_WORKDIR='[^']*/browsershot-[0-9a-f]{16}'#", $shell);
+        // 10s request timeout minus the margin, so node cleans up before PHP's SIGKILL.
+        $this->assertStringContainsString("BROWSERSHOT_DEADLINE_MS='".(10_000 - BrowsershotGenerator::DEADLINE_MARGIN_MS)."'", $shell);
+    }
+
+    public function test_work_dir_is_removed_after_success(): void
+    {
+        $this->execute(['html' => '<p>x</p>']);
+
+        $this->assertWorkDirRemoved();
+    }
+
+    public function test_work_dir_is_removed_after_failure(): void
+    {
+        $generator = $this->generator();
+        $this->fake->throw = new \RuntimeException('chromium crashed');
+
+        try {
+            $generator->run((new RequestValidator)->validate(['html' => '<p>x</p>']));
+            $this->fail('Expected exception');
+        } catch (\RuntimeException) {
+        }
+
+        $this->assertWorkDirRemoved();
+    }
+
+    public function test_work_dir_honours_temp_path(): void
+    {
+        $base = sys_get_temp_dir().'/bs-test-'.bin2hex(random_bytes(4));
+        mkdir($base);
+
+        try {
+            $this->execute(['url' => 'https://example.com'], ['tempPath' => $base]);
+
+            $this->assertStringContainsString("TMPDIR='{$base}/browsershot-", $this->fake->fullCommand($this->fake->lastCommand()));
+            $this->assertSame([], glob($base.'/browsershot-*'));
+        } finally {
+            BrowsershotGenerator::removeDirectory($base);
+        }
+    }
+
+    private function assertWorkDirRemoved(): void
+    {
+        preg_match("#BROWSERSHOT_WORKDIR='([^']+)'#", $this->fake->fullCommand($this->fake->lastCommand()), $m);
+
+        $this->assertNotEmpty($m[1] ?? null);
+        $this->assertDirectoryDoesNotExist($m[1]);
+    }
+
     public function test_user_data_dir_and_custom_arguments(): void
     {
         $args = $this->command(['url' => 'https://example.com'], [

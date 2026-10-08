@@ -12,4 +12,6 @@ mkdir -p /run/nginx
 php-fpm -t >/dev/null 2>&1 || php-fpm -t
 nginx -t -q
 
-exec multirun "php-fpm -F" "nginx -g 'daemon off;'"
+# tini (PID 1) reaps zombies; the reaper kills orphaned Chromium and removes
+# stale temp dirs that the per-request guard could not clean up.
+exec multirun "php-fpm -F" "nginx -g 'daemon off;'" "/usr/local/bin/browsershot-reaper"

@@ -134,12 +134,12 @@ final class RequestValidator
         $url = $this->input['url'] ?? null;
 
         if ($html !== null && ! is_string($html)) {
-            $this->errors[] = 'html harus berupa string';
+            $this->errors[] = 'html must be a string';
             $html = null;
         }
 
         if ($url !== null && ! is_string($url)) {
-            $this->errors[] = 'url harus berupa string';
+            $this->errors[] = 'url must be a string';
             $url = null;
         }
 
@@ -148,7 +148,7 @@ final class RequestValidator
         }
 
         if ($url === null || trim($url) === '') {
-            $this->errors[] = 'Param html atau url harus diisi';
+            $this->errors[] = 'Either html or url is required';
 
             return ['', 'url'];
         }
@@ -157,7 +157,7 @@ final class RequestValidator
         $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
 
         if (filter_var($url, FILTER_VALIDATE_URL) === false || ! in_array($scheme, ['http', 'https'], true)) {
-            $this->errors[] = 'URL tidak valid (hanya http/https)';
+            $this->errors[] = 'Invalid URL (only http/https is allowed)';
         }
 
         return [$url, 'url'];
@@ -168,7 +168,7 @@ final class RequestValidator
         $format = $this->string('format');
         if ($format !== null) {
             if (! in_array(strtolower($format), self::PDF_FORMATS, true)) {
-                $this->errors[] = 'Format tidak valid, gunakan salah satu dari: '.implode(', ', self::PDF_FORMATS);
+                $this->errors[] = 'Invalid format, must be one of: '.implode(', ', self::PDF_FORMATS);
             } else {
                 $this->options['format'] = $format;
             }
@@ -181,7 +181,7 @@ final class RequestValidator
                 foreach (['top', 'right', 'bottom', 'left'] as $side) {
                     $value = $margin[$side] ?? 0;
                     if (! is_int($value) && ! is_float($value) || $value < 0) {
-                        $this->errors[] = 'Margin '.$side.' harus berupa angka >= 0';
+                        $this->errors[] = 'margin.'.$side.' must be a number >= 0';
                     }
                     $normalized[$side] = (float) (is_numeric($value) ? $value : 0);
                 }
@@ -194,7 +194,7 @@ final class RequestValidator
             if ($paper !== null) {
                 foreach (['width', 'height'] as $side) {
                     if (! isset($paper[$side]) || ! is_numeric($paper[$side]) || is_string($paper[$side]) || $paper[$side] <= 0) {
-                        $this->errors[] = "paperSize.$side harus berupa angka > 0";
+                        $this->errors[] = "paperSize.$side must be a number > 0";
                     }
                 }
                 $this->options['paperSize'] = [
@@ -208,7 +208,7 @@ final class RequestValidator
         $pages = $this->string('pages');
         if ($pages !== null) {
             if (! preg_match('/^\s*\d+(\s*-\s*\d*)?(\s*,\s*\d+(\s*-\s*\d*)?)*\s*$/', $pages)) {
-                $this->errors[] = 'pages tidak valid, contoh: "1-3, 5"';
+                $this->errors[] = 'pages must be a page range, e.g. "1-3, 5"';
                 unset($this->options['pages']);
             }
         }
@@ -230,7 +230,7 @@ final class RequestValidator
                 $normalized = [];
                 foreach (['x' => 0, 'y' => 0, 'width' => 1, 'height' => 1] as $key => $min) {
                     if (! isset($clip[$key]) || ! is_int($clip[$key]) || $clip[$key] < $min) {
-                        $this->errors[] = "clip.$key harus berupa integer >= $min";
+                        $this->errors[] = "clip.$key must be an integer >= $min";
                     }
                     $normalized[$key] = (int) ($clip[$key] ?? 0);
                 }
@@ -244,9 +244,9 @@ final class RequestValidator
                 $select = ['selector' => $select];
             }
             if (! is_array($select) || ! isset($select['selector']) || ! is_string($select['selector']) || $select['selector'] === '') {
-                $this->errors[] = 'select harus berupa selector string atau {selector, index}';
+                $this->errors[] = 'select must be a selector string or {selector, index}';
             } elseif (isset($select['index']) && (! is_int($select['index']) || $select['index'] < 0)) {
-                $this->errors[] = 'select.index harus berupa integer >= 0';
+                $this->errors[] = 'select.index must be an integer >= 0';
             } else {
                 $this->options['select'] = ['selector' => $select['selector'], 'index' => $select['index'] ?? 0];
             }
@@ -260,7 +260,7 @@ final class RequestValidator
             if ($size !== null) {
                 foreach (['width', 'height'] as $key) {
                     if (! isset($size[$key]) || ! is_int($size[$key]) || $size[$key] < 1 || $size[$key] > 16384) {
-                        $this->errors[] = "windowSize.$key harus berupa integer 1-16384";
+                        $this->errors[] = "windowSize.$key must be an integer between 1 and 16384";
                     }
                 }
                 $this->options['windowSize'] = ['width' => (int) ($size['width'] ?? 0), 'height' => (int) ($size['height'] ?? 0)];
@@ -273,7 +273,7 @@ final class RequestValidator
         if ($this->has('emulateMedia')) {
             $media = $this->input['emulateMedia'];
             if ($media !== null && ! in_array($media, self::MEDIA_TYPES, true)) {
-                $this->errors[] = 'emulateMedia harus salah satu dari: screen, print, null';
+                $this->errors[] = 'emulateMedia must be one of: screen, print, null';
             } else {
                 $this->options['emulateMedia'] = $media;
             }
@@ -282,7 +282,7 @@ final class RequestValidator
         if ($this->has('emulateMediaFeatures')) {
             $features = $this->input['emulateMediaFeatures'];
             if (! $this->isListOf($features, fn ($f) => is_array($f) && is_string($f['name'] ?? null) && is_string($f['value'] ?? null))) {
-                $this->errors[] = 'emulateMediaFeatures harus berupa list {name, value}';
+                $this->errors[] = 'emulateMediaFeatures must be a list of {name, value}';
             } else {
                 $this->options['emulateMediaFeatures'] = array_map(
                     fn (array $f) => ['name' => $f['name'], 'value' => $f['value']],
@@ -304,11 +304,11 @@ final class RequestValidator
                 $wait = ['function' => $wait];
             }
             if (! is_array($wait) || ! is_string($wait['function'] ?? null) || $wait['function'] === '') {
-                $this->errors[] = 'waitForFunction harus berupa string atau {function, polling, timeout}';
+                $this->errors[] = 'waitForFunction must be a string or {function, polling, timeout}';
             } elseif (isset($wait['polling']) && ! in_array($wait['polling'], self::POLLING, true)) {
-                $this->errors[] = 'waitForFunction.polling harus salah satu dari: raf, mutation';
+                $this->errors[] = 'waitForFunction.polling must be one of: raf, mutation';
             } elseif (isset($wait['timeout']) && (! is_int($wait['timeout']) || $wait['timeout'] < 0)) {
-                $this->errors[] = 'waitForFunction.timeout harus berupa integer >= 0 (ms)';
+                $this->errors[] = 'waitForFunction.timeout must be an integer >= 0 (ms)';
             } else {
                 $this->options['waitForFunction'] = [
                     'function' => $wait['function'],
@@ -324,9 +324,9 @@ final class RequestValidator
                 $wait = ['selector' => $wait];
             }
             if (! is_array($wait) || ! is_string($wait['selector'] ?? null) || $wait['selector'] === '') {
-                $this->errors[] = 'waitForSelector harus berupa string atau {selector, options}';
+                $this->errors[] = 'waitForSelector must be a string or {selector, options}';
             } elseif (isset($wait['options']) && ! $this->isAssoc($wait['options'])) {
-                $this->errors[] = 'waitForSelector.options harus berupa object';
+                $this->errors[] = 'waitForSelector.options must be an object';
             } else {
                 $this->options['waitForSelector'] = ['selector' => $wait['selector'], 'options' => $wait['options'] ?? []];
             }
@@ -374,9 +374,9 @@ final class RequestValidator
             if (! $this->isAssoc($tag) || array_diff(array_keys($tag), $allowed) !== []
                 || (! isset($tag['url']) && ! isset($tag['content']))
                 || array_filter($tag, fn ($v) => ! is_string($v)) !== []) {
-                $this->errors[] = "$key harus berupa object dengan key: ".implode(', ', $allowed).' (path lokal tidak diizinkan)';
+                $this->errors[] = "$key must be an object with keys: ".implode(', ', $allowed).' (local paths are not allowed)';
             } elseif (isset($tag['url']) && ! $this->isHttpUrl($tag['url'])) {
-                $this->errors[] = "$key.url harus berupa URL http/https";
+                $this->errors[] = "$key.url must be an http/https URL";
             } else {
                 $this->options[$key] = $tag;
             }
@@ -392,7 +392,7 @@ final class RequestValidator
             $auth = $this->object('authenticate');
             if ($auth !== null) {
                 if (! is_string($auth['username'] ?? null) || ! is_string($auth['password'] ?? null)) {
-                    $this->errors[] = 'authenticate harus berupa {username, password}';
+                    $this->errors[] = 'authenticate must be {username, password}';
                 } else {
                     $this->options['authenticate'] = ['username' => $auth['username'], 'password' => $auth['password']];
                 }
@@ -409,11 +409,11 @@ final class RequestValidator
             }
 
             if (! $this->isAssoc($cookies) || array_filter($cookies, fn ($v) => ! is_string($v)) !== []) {
-                $this->errors[] = 'cookies harus berupa object {name: value} atau {cookies: {...}, domain}';
+                $this->errors[] = 'cookies must be an object {name: value} or {cookies: {...}, domain}';
             } elseif ($domain !== null && (! is_string($domain) || $domain === '')) {
-                $this->errors[] = 'cookies.domain harus berupa string';
+                $this->errors[] = 'cookies.domain must be a string';
             } elseif ($domain === null && $contentType === 'html') {
-                $this->errors[] = 'cookies.domain wajib diisi jika menggunakan html';
+                $this->errors[] = 'cookies.domain is required when using html';
             } else {
                 $this->options['cookies'] = ['cookies' => $cookies, 'domain' => $domain];
             }
@@ -422,7 +422,7 @@ final class RequestValidator
         if ($this->has('post')) {
             $post = $this->input['post'];
             if (! $this->isAssoc($post) || array_filter($post, fn ($v) => ! is_scalar($v)) !== []) {
-                $this->errors[] = 'post harus berupa object {key: value}';
+                $this->errors[] = 'post must be an object {key: value}';
             } else {
                 $this->options['post'] = $post;
             }
@@ -433,7 +433,7 @@ final class RequestValidator
                 continue;
             }
             if (! $this->isListOf($this->input[$key], fn ($v) => is_string($v) && $v !== '')) {
-                $this->errors[] = "$key harus berupa list string";
+                $this->errors[] = "$key must be a list of strings";
             } else {
                 $this->options[$key] = $this->input[$key];
             }
@@ -441,13 +441,13 @@ final class RequestValidator
 
         $proxy = $this->string('proxyServer', maxLength: 500);
         if ($proxy !== null && ! preg_match('#^((https?|socks[45]?)://)?[A-Za-z0-9.\-\[\]:]+(:\d+)?$#', $proxy)) {
-            $this->errors[] = 'proxyServer tidak valid, contoh: http://host:port';
+            $this->errors[] = 'proxyServer is invalid, e.g. http://host:port';
             unset($this->options['proxyServer']);
         }
 
         $contentUrl = $this->string('contentUrl', maxLength: 2000);
         if ($contentUrl !== null && ! $this->isHttpUrl($contentUrl)) {
-            $this->errors[] = 'contentUrl harus berupa URL http/https';
+            $this->errors[] = 'contentUrl must be an http/https URL';
             unset($this->options['contentUrl']);
         }
     }
@@ -457,7 +457,7 @@ final class RequestValidator
         $hasRemote = $this->has('remoteInstance') || $this->has('wsEndpoint');
 
         if ($hasRemote && ! $this->allowRemoteInstance) {
-            $this->errors[] = 'remoteInstance/wsEndpoint dinonaktifkan (set BROWSERSHOT_ALLOW_REMOTE_INSTANCE=true)';
+            $this->errors[] = 'remoteInstance/wsEndpoint are disabled (set BROWSERSHOT_ALLOW_REMOTE_INSTANCE=true)';
 
             return;
         }
@@ -468,7 +468,7 @@ final class RequestValidator
                 $ip = $remote['ip'] ?? '127.0.0.1';
                 $port = $remote['port'] ?? 9222;
                 if (! is_string($ip) || ! preg_match('/^[A-Za-z0-9.\-]+$/', $ip) || ! is_int($port) || $port < 1 || $port > 65535) {
-                    $this->errors[] = 'remoteInstance harus berupa {ip, port}';
+                    $this->errors[] = 'remoteInstance must be {ip, port}';
                 } else {
                     $this->options['remoteInstance'] = ['ip' => $ip, 'port' => $port];
                 }
@@ -477,7 +477,7 @@ final class RequestValidator
 
         $ws = $this->string('wsEndpoint', maxLength: 2000);
         if ($ws !== null && ! preg_match('#^wss?://#i', $ws)) {
-            $this->errors[] = 'wsEndpoint harus diawali ws:// atau wss://';
+            $this->errors[] = 'wsEndpoint must start with ws:// or wss://';
             unset($this->options['wsEndpoint']);
         }
     }
@@ -497,7 +497,7 @@ final class RequestValidator
         }
 
         if (! is_bool($this->input[$key])) {
-            $this->errors[] = "$key harus boolean (true/false)";
+            $this->errors[] = "$key must be a boolean (true/false)";
 
             return;
         }
@@ -514,7 +514,7 @@ final class RequestValidator
         $value = $this->input[$key];
 
         if (! is_int($value) && ! (is_string($value) && ctype_digit($value))) {
-            $this->errors[] = "$key harus berupa angka";
+            $this->errors[] = "$key must be a number";
 
             return;
         }
@@ -522,7 +522,7 @@ final class RequestValidator
         $value = (int) $value;
 
         if ($value < $min || $value > $max) {
-            $this->errors[] = "$key harus di antara $min dan $max";
+            $this->errors[] = "$key must be between $min and $max";
 
             return;
         }
@@ -539,13 +539,13 @@ final class RequestValidator
         $value = $this->input[$key];
 
         if (! is_int($value) && ! is_float($value)) {
-            $this->errors[] = "$key harus berupa angka";
+            $this->errors[] = "$key must be a number";
 
             return;
         }
 
         if ($value < $min || $value > $max) {
-            $this->errors[] = "$key harus di antara $min dan $max";
+            $this->errors[] = "$key must be between $min and $max";
 
             return;
         }
@@ -557,7 +557,7 @@ final class RequestValidator
     {
         if (! $this->has($key)) {
             if ($required) {
-                $this->errors[] = "$key wajib diisi";
+                $this->errors[] = "$key is required";
             }
 
             return null;
@@ -566,13 +566,13 @@ final class RequestValidator
         $value = $this->input[$key];
 
         if (! is_string($value) || $value === '') {
-            $this->errors[] = "$key harus berupa string";
+            $this->errors[] = "$key must be a string";
 
             return null;
         }
 
         if (strlen($value) > $maxLength) {
-            $this->errors[] = "$key maksimal $maxLength karakter";
+            $this->errors[] = "$key must be at most $maxLength characters";
 
             return null;
         }
@@ -591,7 +591,7 @@ final class RequestValidator
         }
 
         if (! in_array($this->input[$key], $allowed, true)) {
-            $this->errors[] = ucfirst($key).' harus salah satu dari: '.implode(', ', $allowed);
+            $this->errors[] = $key.' must be one of: '.implode(', ', $allowed);
 
             return null;
         }
@@ -602,7 +602,7 @@ final class RequestValidator
     private function object(string $key): ?array
     {
         if (! $this->isAssoc($this->input[$key])) {
-            $this->errors[] = "$key harus berupa object";
+            $this->errors[] = "$key must be an object";
 
             return null;
         }
@@ -615,7 +615,7 @@ final class RequestValidator
         $unit = $data['unit'] ?? 'mm';
 
         if (! in_array($unit, self::UNITS, true)) {
-            $this->errors[] = "$key.unit harus salah satu dari: ".implode(', ', self::UNITS);
+            $this->errors[] = "$key.unit must be one of: ".implode(', ', self::UNITS);
 
             return 'mm';
         }
@@ -632,7 +632,7 @@ final class RequestValidator
         $value = $this->input[$key];
 
         if (! $this->isAssoc($value) || array_filter($value, fn ($v) => ! is_string($v)) !== []) {
-            $this->errors[] = "$key harus berupa object {name: value} dengan value string";
+            $this->errors[] = "$key must be an object {name: value} with string values";
 
             return;
         }
@@ -654,7 +654,7 @@ final class RequestValidator
         }
 
         if (! $this->isListOf($value, $rule)) {
-            $this->errors[] = "$key harus berupa list $shape";
+            $this->errors[] = "$key must be a list of $shape";
 
             return;
         }

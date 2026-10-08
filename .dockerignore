@@ -1,15 +1,46 @@
+# The Dockerfile only COPYs what it needs (composer/npm manifests, app/,
+# public/index.php, .docker/*). Everything else is excluded to keep the build
+# context small and to avoid leaking local files into the image.
+
+# VCS / CI / editors
 .git
+.gitignore
+.gitattributes
 .github
 .idea
+.vscode
+*.swp
 .DS_Store
-.phpunit.cache
-.docker/*.md
-node_modules
+
+# Dependencies (installed inside the build stages)
 vendor
+node_modules
+
+# Tests & tooling
 tests
 phpunit.xml
-public/tmp
-docker-compose*.yml
+phpunit.xml.dist
+.phpunit.cache
+.phpunit.result.cache
+coverage
+
+# Docs
+*.md
+docs
+LICENSE*
+
+# Docker files not needed inside the image
 Dockerfile
 .dockerignore
-*.md
+docker-compose*.yml
+compose*.yml
+
+# Runtime leftovers
+public/tmp
+*.log
+
+# Secrets / local env
+.env
+.env.*
+*.pem
+*.key

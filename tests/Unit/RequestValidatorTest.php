@@ -33,8 +33,8 @@ final class RequestValidatorTest extends TestCase
 
     public function test_requires_html_or_url(): void
     {
-        $this->assertInvalid([], 'Param html atau url harus diisi');
-        $this->assertInvalid(['html' => '', 'url' => ''], 'Param html atau url harus diisi');
+        $this->assertInvalid([], 'Either html or url is required');
+        $this->assertInvalid(['html' => '', 'url' => ''], 'Either html or url is required');
     }
 
     public function test_accepts_html(): void
@@ -72,13 +72,13 @@ final class RequestValidatorTest extends TestCase
     #[DataProvider('invalidUrls')]
     public function test_rejects_non_http_urls(string $url): void
     {
-        $this->assertInvalid(['url' => $url], 'URL tidak valid');
+        $this->assertInvalid(['url' => $url], 'Invalid URL');
     }
 
     public function test_rejects_non_string_content(): void
     {
-        $this->assertInvalid(['html' => ['x']], 'html harus berupa string');
-        $this->assertInvalid(['url' => 123], 'url harus berupa string');
+        $this->assertInvalid(['html' => ['x']], 'html must be a string');
+        $this->assertInvalid(['url' => 123], 'url must be a string');
     }
 
     // ----------------------------------------------------------- type / action
@@ -105,7 +105,7 @@ final class RequestValidatorTest extends TestCase
 
     public function test_rejects_unknown_type(): void
     {
-        $this->assertInvalid(['url' => 'https://example.com', 'type' => 'gif'], 'Type harus salah satu dari');
+        $this->assertInvalid(['url' => 'https://example.com', 'type' => 'gif'], 'type must be one of');
     }
 
     public static function actions(): array
@@ -126,12 +126,12 @@ final class RequestValidatorTest extends TestCase
 
     public function test_rejects_unknown_action(): void
     {
-        $this->assertInvalid(['url' => 'https://example.com', 'action' => 'shell'], 'Action harus salah satu dari');
+        $this->assertInvalid(['url' => 'https://example.com', 'action' => 'shell'], 'action must be one of');
     }
 
     public function test_evaluate_requires_page_function(): void
     {
-        $this->assertInvalid(['url' => 'https://example.com', 'action' => 'evaluate'], 'pageFunction wajib diisi');
+        $this->assertInvalid(['url' => 'https://example.com', 'action' => 'evaluate'], 'pageFunction is required');
 
         $result = $this->validate(['url' => 'https://example.com', 'action' => 'evaluate', 'pageFunction' => 'document.title']);
         $this->assertSame('document.title', $result['pageFunction']);
@@ -158,7 +158,7 @@ final class RequestValidatorTest extends TestCase
     {
         $this->assertTrue($this->validate(['url' => 'https://example.com', $key => true])['options'][$key]);
         $this->assertFalse($this->validate(['url' => 'https://example.com', $key => false])['options'][$key]);
-        $this->assertInvalid(['url' => 'https://example.com', $key => 'yes'], "$key harus boolean");
+        $this->assertInvalid(['url' => 'https://example.com', $key => 'yes'], "$key must be a boolean");
     }
 
     // ----------------------------------------------------------- pdf
@@ -173,7 +173,7 @@ final class RequestValidatorTest extends TestCase
     public function test_rejects_unsupported_pdf_format(): void
     {
         // A7-A10 are not supported by Puppeteer.
-        $this->assertInvalid(['url' => 'https://example.com', 'format' => 'A7'], 'Format tidak valid');
+        $this->assertInvalid(['url' => 'https://example.com', 'format' => 'A7'], 'Invalid format');
     }
 
     public function test_margin_normalization(): void
@@ -185,10 +185,10 @@ final class RequestValidatorTest extends TestCase
 
     public function test_margin_validation(): void
     {
-        $this->assertInvalid(['url' => 'https://example.com', 'margin' => ['top' => 'abc']], 'Margin top harus berupa angka');
-        $this->assertInvalid(['url' => 'https://example.com', 'margin' => ['top' => -1]], 'Margin top');
+        $this->assertInvalid(['url' => 'https://example.com', 'margin' => ['top' => 'abc']], 'margin.top must be a number');
+        $this->assertInvalid(['url' => 'https://example.com', 'margin' => ['top' => -1]], 'margin.top');
         $this->assertInvalid(['url' => 'https://example.com', 'margin' => ['unit' => 'pt']], 'margin.unit');
-        $this->assertInvalid(['url' => 'https://example.com', 'margin' => '10mm'], 'margin harus berupa object');
+        $this->assertInvalid(['url' => 'https://example.com', 'margin' => '10mm'], 'margin must be an object');
     }
 
     public function test_paper_size(): void
@@ -206,15 +206,15 @@ final class RequestValidatorTest extends TestCase
             $this->assertSame($pages, $this->validate(['url' => 'https://example.com', 'pages' => $pages])['options']['pages']);
         }
 
-        $this->assertInvalid(['url' => 'https://example.com', 'pages' => 'abc'], 'pages tidak valid');
+        $this->assertInvalid(['url' => 'https://example.com', 'pages' => 'abc'], 'pages must be a page range');
     }
 
     public function test_scale(): void
     {
         $this->assertSame(0.5, $this->validate(['url' => 'https://example.com', 'scale' => 0.5])['options']['scale']);
         $this->assertSame(2.0, $this->validate(['url' => 'https://example.com', 'scale' => 2])['options']['scale']);
-        $this->assertInvalid(['url' => 'https://example.com', 'scale' => 3], 'scale harus di antara');
-        $this->assertInvalid(['url' => 'https://example.com', 'scale' => '1'], 'scale harus berupa angka');
+        $this->assertInvalid(['url' => 'https://example.com', 'scale' => 3], 'scale must be between');
+        $this->assertInvalid(['url' => 'https://example.com', 'scale' => '1'], 'scale must be a number');
     }
 
     public function test_header_footer_and_initial_page(): void
@@ -244,9 +244,9 @@ final class RequestValidatorTest extends TestCase
         // Numeric strings are accepted for backwards compatibility.
         $this->assertSame(70, $this->validate(['url' => 'https://example.com', 'quality' => '70'])['options']['quality']);
 
-        $this->assertInvalid(['url' => 'https://example.com', 'quality' => 101], 'quality harus di antara 0 dan 100');
-        $this->assertInvalid(['url' => 'https://example.com', 'quality' => 'high'], 'quality harus berupa angka');
-        $this->assertInvalid(['url' => 'https://example.com', 'deviceScaleFactor' => 4], 'deviceScaleFactor harus di antara 1 dan 3');
+        $this->assertInvalid(['url' => 'https://example.com', 'quality' => 101], 'quality must be between 0 and 100');
+        $this->assertInvalid(['url' => 'https://example.com', 'quality' => 'high'], 'quality must be a number');
+        $this->assertInvalid(['url' => 'https://example.com', 'deviceScaleFactor' => 4], 'deviceScaleFactor must be between 1 and 3');
     }
 
     public function test_clip(): void
@@ -262,7 +262,7 @@ final class RequestValidatorTest extends TestCase
         $this->assertSame(['selector' => '#a', 'index' => 0], $this->validate(['url' => 'https://example.com', 'select' => '#a'])['options']['select']);
         $this->assertSame(['selector' => '.b', 'index' => 2], $this->validate(['url' => 'https://example.com', 'select' => ['selector' => '.b', 'index' => 2]])['options']['select']);
 
-        $this->assertInvalid(['url' => 'https://example.com', 'select' => ['index' => 1]], 'select harus berupa selector');
+        $this->assertInvalid(['url' => 'https://example.com', 'select' => ['index' => 1]], 'select must be a selector');
         $this->assertInvalid(['url' => 'https://example.com', 'select' => ['selector' => '#a', 'index' => -1]], 'select.index');
     }
 
@@ -303,8 +303,8 @@ final class RequestValidatorTest extends TestCase
         $this->assertSame(120, $options['timeout']);
         $this->assertSame(30, $options['protocolTimeout']);
 
-        $this->assertInvalid(['url' => 'https://example.com', 'timeout' => 0], 'timeout harus di antara');
-        $this->assertInvalid(['url' => 'https://example.com', 'timeout' => 'abc'], 'timeout harus berupa angka');
+        $this->assertInvalid(['url' => 'https://example.com', 'timeout' => 0], 'timeout must be between');
+        $this->assertInvalid(['url' => 'https://example.com', 'timeout' => 'abc'], 'timeout must be a number');
         $this->assertInvalid(['url' => 'https://example.com', 'delay' => -1], 'delay');
     }
 
@@ -350,8 +350,8 @@ final class RequestValidatorTest extends TestCase
         $this->assertSame([['selector' => '#name', 'text' => 'Aditya', 'delay' => 0]], $options['typeText']);
         $this->assertSame([['selector' => '#color', 'value' => 'red']], $options['selectOption']);
 
-        $this->assertInvalid(['url' => 'https://example.com', 'click' => [['selector' => '#a', 'button' => 'back']]], 'click harus berupa list');
-        $this->assertInvalid(['url' => 'https://example.com', 'typeText' => [['text' => 'x']]], 'typeText harus berupa list');
+        $this->assertInvalid(['url' => 'https://example.com', 'click' => [['selector' => '#a', 'button' => 'back']]], 'click must be a list');
+        $this->assertInvalid(['url' => 'https://example.com', 'typeText' => [['text' => 'x']]], 'typeText must be a list');
     }
 
     public function test_style_and_script_tags_reject_local_paths(): void
@@ -365,7 +365,7 @@ final class RequestValidatorTest extends TestCase
         $this->assertSame(['content' => 'body{color:red}'], $options['addStyleTag']);
         $this->assertSame(['url' => 'https://cdn.example.com/x.js', 'type' => 'module'], $options['addScriptTag']);
 
-        $this->assertInvalid(['url' => 'https://example.com', 'addStyleTag' => ['path' => '/etc/passwd']], 'path lokal tidak diizinkan');
+        $this->assertInvalid(['url' => 'https://example.com', 'addStyleTag' => ['path' => '/etc/passwd']], 'local paths are not allowed');
         $this->assertInvalid(['url' => 'https://example.com', 'addScriptTag' => ['url' => 'file:///etc/passwd']], 'addScriptTag.url');
     }
 
@@ -401,7 +401,7 @@ final class RequestValidatorTest extends TestCase
         $this->assertInvalid(['url' => 'https://example.com', 'authenticate' => ['username' => 'u']], 'authenticate');
         $this->assertInvalid(['url' => 'https://example.com', 'post' => ['a' => ['b']]], 'post');
         $this->assertInvalid(['url' => 'https://example.com', 'blockUrls' => 'x'], 'blockUrls');
-        $this->assertInvalid(['url' => 'https://example.com', 'proxyServer' => 'http://a b; rm -rf /'], 'proxyServer tidak valid');
+        $this->assertInvalid(['url' => 'https://example.com', 'proxyServer' => 'http://a b; rm -rf /'], 'proxyServer is invalid');
         $this->assertInvalid(['url' => 'https://example.com', 'contentUrl' => 'file:///tmp/'], 'contentUrl');
     }
 
@@ -417,16 +417,16 @@ final class RequestValidatorTest extends TestCase
         );
 
         // Spatie derives the domain from the URL, which is empty for html.
-        $this->assertInvalid(['html' => '<p>x</p>', 'cookies' => ['session' => 'abc']], 'cookies.domain wajib');
-        $this->assertInvalid(['url' => 'https://example.com', 'cookies' => ['session' => 1]], 'cookies harus berupa object');
+        $this->assertInvalid(['html' => '<p>x</p>', 'cookies' => ['session' => 'abc']], 'cookies.domain is required');
+        $this->assertInvalid(['url' => 'https://example.com', 'cookies' => ['session' => 1]], 'cookies must be an object');
     }
 
     // ----------------------------------------------------------- remote
 
     public function test_remote_instance_is_disabled_by_default(): void
     {
-        $this->assertInvalid(['url' => 'https://example.com', 'remoteInstance' => ['ip' => '10.0.0.1', 'port' => 9222]], 'dinonaktifkan');
-        $this->assertInvalid(['url' => 'https://example.com', 'wsEndpoint' => 'ws://x'], 'dinonaktifkan');
+        $this->assertInvalid(['url' => 'https://example.com', 'remoteInstance' => ['ip' => '10.0.0.1', 'port' => 9222]], 'are disabled');
+        $this->assertInvalid(['url' => 'https://example.com', 'wsEndpoint' => 'ws://x'], 'are disabled');
     }
 
     public function test_remote_instance_when_enabled(): void
@@ -440,8 +440,8 @@ final class RequestValidatorTest extends TestCase
         $this->assertSame(['ip' => 'chrome', 'port' => 9222], $options['remoteInstance']);
         $this->assertSame('ws://chrome:3000', $options['wsEndpoint']);
 
-        $this->assertInvalid(['url' => 'https://example.com', 'wsEndpoint' => 'http://x'], 'wsEndpoint harus diawali', true);
-        $this->assertInvalid(['url' => 'https://example.com', 'remoteInstance' => ['port' => 70000]], 'remoteInstance harus', true);
+        $this->assertInvalid(['url' => 'https://example.com', 'wsEndpoint' => 'http://x'], 'wsEndpoint must start with', true);
+        $this->assertInvalid(['url' => 'https://example.com', 'remoteInstance' => ['port' => 70000]], 'remoteInstance must', true);
     }
 
     // ----------------------------------------------------------- security

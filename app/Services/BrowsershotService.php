@@ -14,6 +14,7 @@ use Spatie\Browsershot\Exceptions\HtmlIsNotAllowedToContainFile;
 use Spatie\Browsershot\Exceptions\RemoteConnectionException;
 use Spatie\Browsershot\Exceptions\UnsuccessfulResponse;
 use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Throwable;
 
@@ -58,8 +59,17 @@ class BrowsershotService
             return $this->error($e->getMessage(), 502);
         } catch (ProcessTimedOutException $e) {
             return $this->error('Browser timeout', 504, $this->debugInfo($e));
-        } catch (ProcessFailedException|CouldNotTakeBrowsershot $e) {
-            return $this->error('Browser gagal memproses permintaan', 500, $this->debugInfo($e));
+        } catch (ProcessFailedException $e) {
+            // Exit codes from bin/browser-guard.cjs.
+            return match ($e->getProcess()->getExitCode()) {
+                124 => $this->error('Browser timeout', 504, $this->debugInfo($e)),
+                default => $this->error('Browser failed to process the request', 500, $this->debugInfo($e)),
+            };
+        } catch (ProcessSignaledException $e) {
+            // Node was killed by a signal PHP did not send (OOM killer, operator, ...).
+            return $this->error('Browser process was killed', 500, $this->debugInfo($e));
+        } catch (CouldNotTakeBrowsershot $e) {
+            return $this->error('Browser failed to process the request', 500, $this->debugInfo($e));
         } catch (Throwable $e) {
             return $this->error('Internal server error', 500, $this->debugInfo($e));
         }
