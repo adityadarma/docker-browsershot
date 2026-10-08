@@ -1,395 +1,443 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Libraries;
 
-use Exception;
+use Closure;
 use Spatie\Browsershot\Browsershot;
+use Spatie\Browsershot\Enums\Polling;
 
+/**
+ * Builds a Spatie Browsershot instance from a normalized request (see
+ * App\Services\RequestValidator) and server config (see App\Support\Config),
+ * then runs the requested action.
+ */
 class BrowsershotGenerator
 {
-    protected $content;
-    protected $contentType; // 'html' or 'url'
-    protected $outputType = 'pdf';
-    protected $options = [
-        'format' => 'A4',
-        'landscape' => false,
-        'fullPage' => false,
-        'margin' => null,
-        'timeout' => 60,
-        'noSandbox' => true,
-        'deviceScaleFactor' => 1,
-        'quality' => 90,
-        'nodeBinary' => '/usr/bin/node',
-        'npmBinary' => '/usr/bin/npm',
-        'executablePath' => '/usr/bin/chromium-browser',
-        'includePath' => '$PATH:/usr/local/bin',
+    public const MIME_TYPES = [
+        'pdf' => 'application/pdf',
+        'png' => 'image/png',
+        'jpeg' => 'image/jpeg',
+        'jpg' => 'image/jpeg',
+        'webp' => 'image/webp',
     ];
 
+    /** Default JPEG/WebP quality when the client does not send one. */
+    public const DEFAULT_QUALITY = 90;
+
+    private Closure $factory;
+
     /**
-     * Constructor
-     *
-     * @param string $content HTML content or URL
-     * @param string $type 'html' or 'url'
+     * @param  array  $config  Server config, see Config::browsershot()
+     * @param  (callable(bool $deviceEmulate): Browsershot)|null  $factory  Creates the Browsershot instance (overridable in tests)
      */
-    public function __construct(string $content = '', string $type = 'html')
+    public function __construct(private readonly array $config = [], ?callable $factory = null)
     {
-        $this->setContent($content, $type);
+        $this->factory = $factory !== null
+            ? Closure::fromCallable($factory)
+            : static fn (bool $deviceEmulate = false): Browsershot => new Browsershot('', $deviceEmulate);
     }
 
     /**
-     * Set content (HTML or URL)
-     *
-     * @param string $content
-     * @param string $type 'html' or 'url'
-     * @return $this
-     * @throws \InvalidArgumentException
+     * Build a configured Browsershot instance without calling the browser.
      */
-    public function setContent(string $content, string $type = 'html'): self
+    public function build(array $request): Browsershot
     {
-        if (!in_array($type, ['html', 'url'])) {
-            throw new \InvalidArgumentException("Content type must be either 'html' or 'url'");
-        }
+        $options = $request['options'] ?? [];
+        $type = $request['type'] ?? 'png';
 
-        $this->content = $content;
-        $this->contentType = $type;
-        return $this;
-    }
+        // With a device, skip Spatie's default 800x600 viewport: browser.cjs applies
+        // `viewport` after `emulate(device)`, so it would override the device size.
+        $deviceEmulate = isset($options['device']) && ! isset($options['windowSize']);
 
-    /**
-     * Set output type (pdf or image)
-     *
-     * @param string $type
-     * @return $this
-     * @throws \InvalidArgumentException
-     */
-    public function setOutputType(string $type): self
-    {
-        if (!in_array($type, ['pdf', 'png', 'jpeg', 'jpg'])) {
-            throw new \InvalidArgumentException("Output type must be either 'pdf', 'png', 'jpeg', 'jpg'");
-        }
+        /** @var Browsershot $browsershot */
+        $browsershot = ($this->factory)($deviceEmulate);
 
-        $this->outputType = $type;
-        return $this;
-    }
+        $request['contentType'] === 'html'
+            ? $browsershot->setHtml($request['content'])
+            : $browsershot->setUrl($request['content']);
 
-    /**
-     * Set paper format
-     *
-     * @param string $format
-     * @return $this
-     */
-    public function format(string $format): self
-    {
-        $this->options['format'] = $format;
-        return $this;
-    }
+        $this->applyServerConfig($browsershot);
+        $this->applyPageOptions($browsershot, $options);
+        $this->applyNetworkOptions($browsershot, $options);
+        $this->applyInteractionOptions($browsershot, $options);
 
-    /**
-     * Set landscape orientation
-     *
-     * @param bool $landscape
-     * @return $this
-     */
-    public function landscape(bool $landscape = true): self
-    {
-        $this->options['landscape'] = $landscape;
-        return $this;
-    }
-
-    /**
-     * Set full page capture
-     *
-     * @param bool $fullPage
-     * @return $this
-     */
-    public function fullPage(bool $fullPage = true): self
-    {
-        $this->options['fullPage'] = $fullPage;
-        return $this;
-    }
-
-    /**
-     * Set margins
-     *
-     * @param mixed $margin (string or array)
-     * @return $this
-     */
-    public function margin($margin): self
-    {
-        $this->options['margin'] = $margin;
-        return $this;
-    }
-
-    /**
-     * Set timeout
-     *
-     * @param int $timeout
-     * @return $this
-     */
-    public function timeout(int $timeout): self
-    {
-        $this->options['timeout'] = $timeout;
-        return $this;
-    }
-
-    /**
-     * Set noSandbox option
-     *
-     * @param bool $noSandbox
-     * @return $this
-     */
-    public function noSandbox(bool $noSandbox = true): self
-    {
-        $this->options['noSandbox'] = $noSandbox;
-        return $this;
-    }
-
-    /**
-     * Set device scale factor
-     *
-     * @param float $factor
-     * @return $this
-     */
-    public function deviceScaleFactor(float $factor): self
-    {
-        $this->options['deviceScaleFactor'] = $factor;
-        return $this;
-    }
-
-    /**
-     * Set image quality
-     *
-     * @param int $quality
-     * @return $this
-     */
-    public function quality(int $quality): self
-    {
-        $this->options['quality'] = $quality;
-        return $this;
-    }
-
-    /**
-     * Set Node.js binary path
-     *
-     * @param string $path
-     * @return $this
-     */
-    public function setNodeBinary(string $path): self
-    {
-        $this->options['nodeBinary'] = $path;
-        return $this;
-    }
-
-    /**
-     * Set NPM binary path
-     *
-     * @param string $path
-     * @return $this
-     */
-    public function setNpmBinary(string $path): self
-    {
-        $this->options['npmBinary'] = $path;
-        return $this;
-    }
-
-    /**
-     * Get content as base64
-     *
-     * @return string
-     */
-    public function getBase64(): string
-    {
-        $browsershot = $this->prepareBrowsershot();
-
-        if ($this->outputType === 'pdf') {
-            return $browsershot->base64pdf();
-        }
-
-        return $browsershot->base64Screenshot();
-    }
-
-    /**
-     * Get content as binary string
-     *
-     * @return string
-     */
-    public function getBinary(): string
-    {
-        $browsershot = $this->prepareBrowsershot();
-
-        if ($this->outputType === 'pdf') {
-            return $browsershot->pdf();
-        }
-
-        return $browsershot->screenshot();
-    }
-
-    /**
-     * Save PDF to file
-     * 
-     * @param string $path File path to save
-     * @param bool $overwrite Overwrite existing file
-     * @return array
-     */
-    public function savePdf(string $path, bool $overwrite = false): array
-    {
-        return $this->save($path, [
-            'type' => 'pdf',
-            'overwrite' => $overwrite
-        ]);
-    }
-
-    /**
-     * Save image to file
-     * 
-     * @param string $path File path to save
-     * @param string $type Image type (png, jpeg)
-     * @param bool $overwrite Overwrite existing file
-     * @return array
-     */
-    public function saveImage(string $path, string $type = 'png', bool $overwrite = false): array
-    {
-        return $this->save($path, [
-            'type' => $type,
-            'overwrite' => $overwrite
-        ]);
-    }
-
-    /**
-     * Save the output directly using Browsershot's save functionality
-     * 
-     * @param string $filePath Path to save the file
-     * @param array $options Save options:
-     *              - 'overwrite' => bool
-     *              - 'type' => 'pdf'|'png'|'jpeg'
-     * @return array
-     */
-    public function save(string $filePath, array $options = []): array
-    {
-        $defaultOptions = [
-            'overwrite' => false,
-            'type' => $this->outputType,
-        ];
-        
-        $options = array_merge($defaultOptions, $options);
-        
-        try {
-            // Check if file exists and overwrite is false
-            if (file_exists($filePath) && !$options['overwrite']) {
-                throw new Exception("File already exists at path: {$filePath}");
-            }
-            
-            // Prepare the Browsershot instance
-            $browsershot = $this->prepareBrowsershot();
-            
-            // Determine save method based on type
-            switch ($options['type']) {
-                case 'pdf':
-                    $browsershot->save($filePath);
-                    $mimeType = 'application/pdf';
-                    break;
-                    
-                case 'png':
-                    $browsershot->save($filePath);
-                    $mimeType = 'image/png';
-                    break;
-                    
-                case 'jpeg':
-                case 'jpg':
-                    $browsershot->save($filePath);
-                    $mimeType = 'image/jpeg';
-                    break;
-                    
-                default:
-                    throw new Exception("Unsupported file type: {$options['type']}");
-            }
-            
-            // Verify file was created
-            if (!file_exists($filePath)) {
-                throw new Exception("Failed to save file to: {$filePath}");
-            }
-
-            $image_data = file_get_contents($filePath);
-            $base64string = base64_encode($image_data);
-            $fileSize = filesize($filePath);
-            
-            return [
-                'data' => [
-                    'path' => $filePath,
-                    'size' => $fileSize,
-                    'base64' => $base64string,
-                    'mime_type' => $mimeType
-                ]
-            ];
-        } catch (Exception $e) {
-            return [
-                'status' => 'error',
-                'message' => $e->getMessage(),
-                'code' => 500
-            ];
-        } finally {
-            unlink($filePath);
-        }
-    }
-
-    /**
-     * Prepare a Browsershot instance with configured options
-     *
-     * @return Browsershot
-     */
-    protected function prepareBrowsershot(): Browsershot
-    {
-        $browsershot = $this->contentType === 'html' 
-            ? Browsershot::html($this->content)
-            : Browsershot::url($this->content);
-
-        $browsershot
-            ->setNodeBinary($this->options['nodeBinary'])
-            ->setNpmBinary($this->options['npmBinary'])
-            ->setOption('args', [
-                '--headless=new',
-                '--disable-gpu',
-                '--disable-dev-shm-usage',
-                '--disable-features=Crashpad',
-                '--disable-extensions',
-                '--no-zygote',
-                '--mute-audio'
-            ])
-            ->setOption('userDataDir', '/tmp/chrome-user')
-            ->timeout($this->options['timeout']);
-
-        if ($this->options['executablePath']) {
-            $browsershot->setChromePath($this->options['executablePath']);
-        }
-
-        if ($this->options['noSandbox']) {
-            $browsershot->addChromiumArguments(['no-sandbox']);
-        }
-
-        if ($this->options['includePath']) {
-            $browsershot->setIncludePath($this->options['includePath']);
-        }
-        
-        if ($this->outputType === 'pdf') {
-            $browsershot
-                ->format($this->options['format'])
-                ->landscape($this->options['landscape']);
-
-            if ($this->options['margin']) {
-                $browsershot->margins(
-                    $this->options['margin']['top'] ?? 0,
-                    $this->options['margin']['right'] ?? 0,
-                    $this->options['margin']['bottom'] ?? 0,
-                    $this->options['margin']['left'] ?? 0
-                );
-            }
+        if ($type === 'pdf') {
+            $this->applyPdfOptions($browsershot, $options);
         } else {
-            $browsershot
-                ->fullPage()
-                ->deviceScaleFactor($this->options['deviceScaleFactor']);
-                // ->setScreenshotType($this->outputType, $this->options['quality']);
+            $this->applyScreenshotOptions($browsershot, $options, $type);
         }
+
+        $this->applyShared($browsershot, $options);
 
         return $browsershot;
+    }
+
+    /**
+     * Execute the request and return the API `data` payload.
+     */
+    public function run(array $request): array
+    {
+        $browsershot = $this->build($request);
+        $action = $request['action'] ?? 'render';
+        $type = $request['type'] ?? 'png';
+
+        return match ($action) {
+            'render' => $this->render($browsershot, $type),
+            'bodyHtml' => ['html' => $browsershot->bodyHtml()],
+            'evaluate' => ['result' => $browsershot->evaluate($request['pageFunction'])],
+            'triggeredRequests' => ['requests' => $browsershot->triggeredRequests() ?? []],
+            'redirectHistory' => ['redirects' => $browsershot->redirectHistory() ?? []],
+            'consoleMessages' => ['messages' => $browsershot->consoleMessages() ?? []],
+            'failedRequests' => ['requests' => $browsershot->failedRequests() ?? []],
+            'pageErrors' => ['errors' => $browsershot->pageErrors() ?? []],
+            default => throw new \InvalidArgumentException("Unsupported action: {$action}"),
+        };
+    }
+
+    private function render(Browsershot $browsershot, string $type): array
+    {
+        $base64 = $type === 'pdf'
+            ? $browsershot->base64pdf()
+            : $browsershot->base64Screenshot();
+
+        if ($base64 === '') {
+            throw new \RuntimeException('Browser returned empty output');
+        }
+
+        return [
+            'size' => strlen((string) base64_decode($base64, true)),
+            'base64' => $base64,
+            'mime_type' => self::MIME_TYPES[$type],
+            'extension' => $type === 'jpg' ? 'jpg' : $type,
+        ];
+    }
+
+    private function applyServerConfig(Browsershot $browsershot): void
+    {
+        $config = $this->config;
+
+        if (! empty($config['nodeBinary'])) {
+            $browsershot->setNodeBinary($config['nodeBinary']);
+        }
+
+        if (! empty($config['npmBinary'])) {
+            $browsershot->setNpmBinary($config['npmBinary']);
+        }
+
+        if (! empty($config['nodeModulePath'])) {
+            $browsershot->setNodeModulePath($config['nodeModulePath']);
+        }
+
+        if (! empty($config['chromePath'])) {
+            $browsershot->setChromePath($config['chromePath']);
+        }
+
+        if (! empty($config['includePath'])) {
+            $browsershot->setIncludePath($config['includePath']);
+        }
+
+        if (! empty($config['tempPath'])) {
+            $browsershot->setCustomTempPath($config['tempPath']);
+        }
+
+        if (! empty($config['chromiumArguments'])) {
+            $browsershot->addChromiumArguments($config['chromiumArguments']);
+        }
+
+        if (! empty($config['userDataDir'])) {
+            $browsershot->setUserDataDir($config['userDataDir']);
+        }
+
+        if ($config['noSandbox'] ?? false) {
+            $browsershot->noSandbox();
+        }
+
+        $browsershot->timeout((int) ($config['timeout'] ?? 60));
+    }
+
+    private function applyPageOptions(Browsershot $browsershot, array $options): void
+    {
+        if (isset($options['windowSize'])) {
+            $browsershot->windowSize($options['windowSize']['width'], $options['windowSize']['height']);
+        }
+
+        if (isset($options['device'])) {
+            $browsershot->device($options['device']);
+        }
+
+        if (isset($options['userAgent'])) {
+            $browsershot->userAgent($options['userAgent']);
+        }
+
+        if (array_key_exists('emulateMedia', $options)) {
+            $browsershot->emulateMedia($options['emulateMedia']);
+        }
+
+        if (isset($options['emulateMediaFeatures'])) {
+            $browsershot->emulateMediaFeatures($options['emulateMediaFeatures']);
+        }
+
+        // Viewport tweaks would override the emulated device (browser.cjs applies
+        // `viewport` after `emulate(device)`), so they only apply without a device
+        // or together with an explicit windowSize.
+        $viewportAllowed = ! isset($options['device']) || isset($options['windowSize']);
+
+        if ($viewportAllowed && isset($options['mobile'])) {
+            $browsershot->mobile($options['mobile']);
+        }
+
+        if ($viewportAllowed && isset($options['touch'])) {
+            $browsershot->touch($options['touch']);
+        }
+
+        if ($viewportAllowed && isset($options['deviceScaleFactor'])) {
+            $browsershot->deviceScaleFactor($options['deviceScaleFactor']);
+        }
+
+        if (isset($options['delay'])) {
+            $browsershot->setDelay($options['delay']);
+        }
+
+        if (isset($options['timeout'])) {
+            $browsershot->timeout($options['timeout']);
+        }
+
+        if (isset($options['protocolTimeout'])) {
+            $browsershot->protocolTimeout($options['protocolTimeout']);
+        }
+
+        if ($options['disableJavascript'] ?? false) {
+            $browsershot->disableJavascript();
+        }
+
+        if ($options['disableImages'] ?? false) {
+            $browsershot->disableImages();
+        }
+
+        if ($options['dismissDialogs'] ?? false) {
+            $browsershot->dismissDialogs();
+        }
+
+        if ($options['newHeadless'] ?? false) {
+            $browsershot->newHeadless();
+        }
+
+        if (isset($options['contentUrl'])) {
+            $browsershot->setContentUrl($options['contentUrl']);
+        }
+    }
+
+    private function applyNetworkOptions(Browsershot $browsershot, array $options): void
+    {
+        if (isset($options['extraHttpHeaders'])) {
+            $browsershot->setExtraHttpHeaders($options['extraHttpHeaders']);
+        }
+
+        if (isset($options['extraNavigationHttpHeaders'])) {
+            $browsershot->setExtraNavigationHttpHeaders($options['extraNavigationHttpHeaders']);
+        }
+
+        if (isset($options['authenticate'])) {
+            $browsershot->authenticate($options['authenticate']['username'], $options['authenticate']['password']);
+        }
+
+        if (isset($options['cookies'])) {
+            $browsershot->useCookies($options['cookies']['cookies'], $options['cookies']['domain']);
+        }
+
+        if (isset($options['post'])) {
+            $browsershot->post($options['post']);
+        }
+
+        if (isset($options['blockUrls'])) {
+            $browsershot->blockUrls($options['blockUrls']);
+        }
+
+        if (isset($options['blockDomains'])) {
+            $browsershot->blockDomains($options['blockDomains']);
+        }
+
+        if (isset($options['proxyServer'])) {
+            $browsershot->setProxyServer($options['proxyServer']);
+        }
+
+        if ($options['ignoreHttpsErrors'] ?? false) {
+            $browsershot->ignoreHttpsErrors();
+        }
+
+        if ($options['disableRedirects'] ?? false) {
+            $browsershot->disableRedirects();
+        }
+
+        if ($options['disableCaptureURLS'] ?? false) {
+            $browsershot->disableCaptureURLS();
+        }
+
+        if (isset($options['preventUnsuccessfulResponse'])) {
+            $browsershot->preventUnsuccessfulResponse($options['preventUnsuccessfulResponse']);
+        }
+
+        if ($options['waitUntilNetworkIdle'] ?? false) {
+            $browsershot->waitUntilNetworkIdle($options['networkIdleStrict'] ?? true);
+        }
+
+        if (isset($options['remoteInstance'])) {
+            $browsershot->setRemoteInstance($options['remoteInstance']['ip'], $options['remoteInstance']['port']);
+        }
+
+        if (isset($options['wsEndpoint'])) {
+            $browsershot->setWSEndpoint($options['wsEndpoint']);
+        }
+
+        if (isset($options['throwOnRemoteConnectionError'])) {
+            $browsershot->throwOnRemoteConnectionError($options['throwOnRemoteConnectionError']);
+        }
+    }
+
+    private function applyInteractionOptions(Browsershot $browsershot, array $options): void
+    {
+        foreach ($options['click'] ?? [] as $click) {
+            $browsershot->click($click['selector'], $click['button'], $click['clickCount'], $click['delay']);
+        }
+
+        foreach ($options['locatorClick'] ?? [] as $click) {
+            $browsershot->locatorClick($click['selector'], $click['button'], $click['clickCount'], $click['delay']);
+        }
+
+        foreach ($options['typeText'] ?? [] as $type) {
+            $browsershot->type($type['selector'], $type['text'], $type['delay']);
+        }
+
+        foreach ($options['selectOption'] ?? [] as $select) {
+            $browsershot->selectOption($select['selector'], $select['value']);
+        }
+
+        if (isset($options['waitForFunction'])) {
+            $wait = $options['waitForFunction'];
+            $browsershot->waitForFunction($wait['function'], Polling::from($wait['polling']), $wait['timeout']);
+        }
+
+        if (isset($options['waitForSelector'])) {
+            $browsershot->waitForSelector($options['waitForSelector']['selector'], $options['waitForSelector']['options']);
+        }
+
+        if (isset($options['evaluateOnNewDocument'])) {
+            $browsershot->evaluateOnNewDocument($options['evaluateOnNewDocument']);
+        }
+
+        // browser.cjs reads these as JSON strings; no dedicated Spatie method exists.
+        if (isset($options['addStyleTag'])) {
+            $browsershot->setOption('addStyleTag', json_encode($options['addStyleTag']));
+        }
+
+        if (isset($options['addScriptTag'])) {
+            $browsershot->setOption('addScriptTag', json_encode($options['addScriptTag']));
+        }
+    }
+
+    private function applyPdfOptions(Browsershot $browsershot, array $options): void
+    {
+        if (isset($options['paperSize'])) {
+            $paper = $options['paperSize'];
+            $browsershot->paperSize($paper['width'], $paper['height'], $paper['unit']);
+        } else {
+            $browsershot->format($options['format'] ?? 'A4');
+        }
+
+        if (isset($options['landscape'])) {
+            $browsershot->landscape($options['landscape']);
+        }
+
+        if (isset($options['margin'])) {
+            $m = $options['margin'];
+            $browsershot->margins($m['top'], $m['right'], $m['bottom'], $m['left'], $m['unit']);
+        }
+
+        if (isset($options['pages'])) {
+            $browsershot->pages($options['pages']);
+        }
+
+        if (isset($options['scale'])) {
+            $browsershot->scale($options['scale']);
+        }
+
+        if ($options['taggedPdf'] ?? false) {
+            $browsershot->taggedPdf();
+        }
+
+        $hasTemplate = isset($options['headerHtml']) || isset($options['footerHtml'])
+            || ($options['hideHeader'] ?? false) || ($options['hideFooter'] ?? false);
+
+        if (($options['showBrowserHeaderAndFooter'] ?? false) || $hasTemplate) {
+            $browsershot->showBrowserHeaderAndFooter();
+        }
+
+        if (isset($options['headerHtml'])) {
+            $browsershot->headerHtml($options['headerHtml']);
+        }
+
+        if (isset($options['footerHtml'])) {
+            $browsershot->footerHtml($options['footerHtml']);
+        }
+
+        if ($options['hideHeader'] ?? false) {
+            $browsershot->hideHeader();
+        }
+
+        if ($options['hideFooter'] ?? false) {
+            $browsershot->hideFooter();
+        }
+
+        if (isset($options['initialPageNumber'])) {
+            $browsershot->initialPageNumber($options['initialPageNumber']);
+        }
+    }
+
+    private function applyScreenshotOptions(Browsershot $browsershot, array $options, string $type): void
+    {
+        $puppeteerType = $type === 'jpg' ? 'jpeg' : $type;
+
+        // Puppeteer rejects `quality` for PNG.
+        $quality = $puppeteerType === 'png' ? null : ($options['quality'] ?? self::DEFAULT_QUALITY);
+
+        $browsershot->setScreenshotType($puppeteerType, $quality);
+
+        if ($options['fullPage'] ?? false) {
+            $browsershot->fullPage();
+        }
+
+        if (isset($options['clip'])) {
+            $c = $options['clip'];
+            $browsershot->clip($c['x'], $c['y'], $c['width'], $c['height']);
+        }
+
+        if (isset($options['select'])) {
+            $browsershot->select($options['select']['selector'], $options['select']['index']);
+        }
+    }
+
+    private function applyShared(Browsershot $browsershot, array $options): void
+    {
+        if ($options['showBackground'] ?? false) {
+            $browsershot->showBackground();
+        }
+
+        if ($options['hideBackground'] ?? false) {
+            $browsershot->hideBackground();
+        }
+
+        if ($options['transparentBackground'] ?? false) {
+            $browsershot->transparentBackground();
+        }
+
+        if ($options['usePipe'] ?? false) {
+            $browsershot->usePipe();
+        }
+
+        if ($options['writeOptionsToFile'] ?? false) {
+            $browsershot->writeOptionsToFile();
+        }
     }
 }

@@ -1,143 +1,77 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Libraries\BrowsershotGenerator;
-use Exception;
+use App\Support\Config;
+use App\Support\ValidationException;
+use Spatie\Browsershot\Exceptions\CouldNotTakeBrowsershot;
+use Spatie\Browsershot\Exceptions\ElementNotFound;
+use Spatie\Browsershot\Exceptions\FileUrlNotAllowed;
+use Spatie\Browsershot\Exceptions\HtmlIsNotAllowedToContainFile;
+use Spatie\Browsershot\Exceptions\RemoteConnectionException;
+use Spatie\Browsershot\Exceptions\UnsuccessfulResponse;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Throwable;
 
 class BrowsershotService
 {
-    /**
-     * Validasi input
-     */
-    private function validateInput(array $input): array
-    {
-        $errors = [];
-        
-        // Validasi required fields
-        if (empty($input['html']) && empty($input['url'])) {
-            $errors[] = 'Param html atau url harus diisi';
-        }
-        
-        // Validasi URL jika ada
-        if (!empty($input['url']) && !filter_var($input['url'], FILTER_VALIDATE_URL)) {
-            $errors[] = 'URL tidak valid';
-        }
-        
-        // Validasi type
-        $allowedTypes = ['pdf', 'png', 'jpeg', 'jpg'];
-        if (!empty($input['type']) && !in_array($input['type'], $allowedTypes)) {
-            $errors[] = 'Type harus salah satu dari: ' . implode(', ', $allowedTypes);
-        }
-        
-        // Validasi format untuk PDF
-        $allowedFormats = ['A0','A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','Letter','Legal','Tabloid','Ledger'];
-        if (!empty($input['format']) && !in_array($input['format'], $allowedFormats)) {
-            $errors[] = 'Format tidak valid';
-        }
-        
-        // Validasi numeric fields
-        $numericFields = [
-            'margin.top' => 'Margin top',
-            'margin.right' => 'Margin right', 
-            'margin.bottom' => 'Margin bottom',
-            'margin.left' => 'Margin left',
-            'timeout' => 'Timeout',
-            'quality' => 'Quality',
-            'deviceScaleFactor' => 'Device scale factor'
-        ];
-        
-        foreach ($numericFields as $field => $name) {
-            if (isset($input[$field]) && !is_numeric($input[$field])) {
-                $errors[] = "$name harus berupa angka";
-            }
-        }
-        
-        // Validasi boolean fields
-        $booleanFields = ['landscape', 'fullPage'];
-        foreach ($booleanFields as $field) {
-            if (isset($input[$field]) && !is_bool($input[$field])) {
-                $errors[] = "$field harus boolean (true/false)";
-            }
-        }
-        
-        return $errors;
+    private RequestValidator $validator;
+
+    private BrowsershotGenerator $generator;
+
+    public function __construct(
+        ?RequestValidator $validator = null,
+        ?BrowsershotGenerator $generator = null,
+        private readonly bool $debug = false,
+    ) {
+        $this->validator = $validator ?? new RequestValidator(Config::bool('BROWSERSHOT_ALLOW_REMOTE_INSTANCE'));
+        $this->generator = $generator ?? new BrowsershotGenerator(Config::browsershot());
     }
 
     /**
-     * Handle API request
+     * Handle API request. Always returns an array with `status` and `code`
+     * (the HTTP status code to send).
      */
     public function handleRequest(array $input): array
     {
         try {
-            // Validasi input
-            $validationErrors = $this->validateInput($input);
-            if (!empty($validationErrors)) {
-                throw new Exception(implode(', ', $validationErrors));
-            }
-            
-            // Tentukan tipe konten
-            $content = !empty($input['html']) ? $input['html'] : $input['url'];
-            $contentType = !empty($input['html']) ? 'html' : 'url';
-            
-            // Inisialisasi generator
-            $generator = new BrowsershotGenerator($content, $contentType);
-            
-            // Set output type
-            $type = $input['type'] ?? 'png';
+            $request = $this->validator->validate($input);
 
-            if (!empty($input['type'])) {
-                $generator->setOutputType($input['type']);
-            }
-            
-            // Apply options
-            if (!empty($input['format'])) {
-                $generator->format($input['format']);
-            }
-            
-            if (isset($input['landscape'])) {
-                $generator->landscape($input['landscape']);
-            }
-            
-            if (isset($input['fullPage'])) {
-                $generator->fullPage($input['fullPage']);
-            }
-            
-            if (!empty($input['margin'])) {
-                $generator->margin($input['margin']);
-            }
-            
-            if (!empty($input['timeout'])) {
-                $generator->timeout((int)$input['timeout']);
-            }
-            
-            if (!empty($input['quality'])) {
-                $generator->quality((int)$input['quality']);
-            }
-            
-            if (!empty($input['deviceScaleFactor'])) {
-                $generator->deviceScaleFactor((float)$input['deviceScaleFactor']);
-            }
-
-            $randomString = bin2hex(random_bytes(16));
-            $filePath      = "tmp/{$randomString}.{$type}";
-
-            if ($type === 'pdf') {
-                $result = $generator->savePdf($filePath);
-            } else {
-                $result = $generator->saveImage($filePath, $type);
-            }
-
-            return array_merge([
-                'status' => 'success',
-                'code' => 200
-            ], $result);
-        } catch (Exception $e) {
             return [
-                'status' => 'error',
-                'message' => $e->getMessage(),
-                'code' => $e->getCode()
+                'status' => 'success',
+                'code' => 200,
+                'data' => $this->generator->run($request),
             ];
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 422, ['errors' => $e->errors()]);
+        } catch (FileUrlNotAllowed|HtmlIsNotAllowedToContainFile $e) {
+            return $this->error($e->getMessage(), 422);
+        } catch (ElementNotFound $e) {
+            return $this->error($e->getMessage(), 422);
+        } catch (UnsuccessfulResponse $e) {
+            return $this->error($e->getMessage(), 502);
+        } catch (RemoteConnectionException $e) {
+            return $this->error($e->getMessage(), 502);
+        } catch (ProcessTimedOutException $e) {
+            return $this->error('Browser timeout', 504, $this->debugInfo($e));
+        } catch (ProcessFailedException|CouldNotTakeBrowsershot $e) {
+            return $this->error('Browser gagal memproses permintaan', 500, $this->debugInfo($e));
+        } catch (Throwable $e) {
+            return $this->error('Internal server error', 500, $this->debugInfo($e));
         }
+    }
+
+    private function error(string $message, int $code, array $extra = []): array
+    {
+        return array_merge(['status' => 'error', 'code' => $code, 'message' => $message], $extra);
+    }
+
+    private function debugInfo(Throwable $e): array
+    {
+        return $this->debug ? ['error' => $e->getMessage()] : [];
     }
 }
