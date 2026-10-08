@@ -1,11 +1,30 @@
 services:
-  app:
-    image: adityadarma/docker-browsershot:latest
+  browsershot:
+    image: adityadarma/docker-browsershot:${BROWSERSHOT_TAG:-latest}
+    build:
+      context: .
+      args:
+        VERSION: ${BROWSERSHOT_TAG:-dev}
     container_name: browsershot
-    hostname: browsershot
-    # environment:
-    #   - APP_KEY=your_app_key_here
-    #   - APP_DEBUG=true
+    restart: unless-stopped
     ports:
       - "8000:8000"
-    restart: unless-stopped
+    environment:
+      # Required in production: without it the render endpoint is unauthenticated.
+      APP_KEY: ${APP_KEY:-}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      TZ: ${TZ:-UTC}
+      # Each request launches a Chromium process; size this to available RAM.
+      PHP_FPM_MAX_CHILDREN: ${PHP_FPM_MAX_CHILDREN:-5}
+      BROWSERSHOT_DEFAULT_TIMEOUT: ${BROWSERSHOT_DEFAULT_TIMEOUT:-60}
+      BROWSERSHOT_ALLOW_REMOTE_INSTANCE: ${BROWSERSHOT_ALLOW_REMOTE_INSTANCE:-false}
+    # Chromium needs a larger /dev/shm than Docker's 64 MB default.
+    shm_size: 512m
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 2g

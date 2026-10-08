@@ -1,2 +1,15 @@
 .git
 .github
+.idea
+.DS_Store
+.phpunit.cache
+.docker/*.md
+node_modules
+vendor
+tests
+phpunit.xml
+public/tmp
+docker-compose*.yml
+Dockerfile
+.dockerignore
+*.md

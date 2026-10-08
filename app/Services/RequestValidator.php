@@ -292,8 +292,8 @@ final class RequestValidator
         }
 
         $this->int('delay', 0, 300_000);
-        $this->int('timeout', 1, 600);
-        $this->int('protocolTimeout', 1, 600);
+        $this->int('timeout', 1, 300); // keep < nginx fastcgi_read_timeout (310s)
+        $this->int('protocolTimeout', 1, 300);
     }
 
     private function interactionOptions(): void
